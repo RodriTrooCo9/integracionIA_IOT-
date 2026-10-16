@@ -1,0 +1,544 @@
+{
+  "title": "Arquitectura Integrada IoT–PID–IA para Invernadero de Papa (La Paz)",
+  "icons": [
+    {
+      "id": "sensor-icon",
+      "name": "Sensores Agrícolas",
+      "url": "https://assets.isoflow.io/icons/hardware/sensor.svg",
+      "category": "Hardware"
+    },
+    {
+      "id": "actuator-icon",
+      "name": "Actuadores Térmicos",
+      "url": "https://assets.isoflow.io/icons/hardware/switch.svg",
+      "category": "Hardware"
+    },
+    {
+      "id": "camera-icon",
+      "name": "Cámara HD / Trampa",
+      "url": "https://assets.isoflow.io/icons/hardware/camera.svg",
+      "category": "Hardware"
+    },
+    {
+      "id": "esp32-icon",
+      "name": "ESP32 Microcontrolador",
+      "url": "https://assets.isoflow.io/icons/hardware/chip.svg",
+      "category": "Hardware"
+    },
+    {
+      "id": "mqtt-icon",
+      "name": "Mosquitto Broker",
+      "url": "https://assets.isoflow.io/icons/networking/router.svg",
+      "category": "Networking"
+    },
+    {
+      "id": "telegraf-icon",
+      "name": "Telegraf Collector",
+      "url": "https://assets.isoflow.io/icons/services/function-module.svg",
+      "category": "Data"
+    },
+    {
+      "id": "influx-icon",
+      "name": "InfluxDB v2 Time-Series",
+      "url": "https://assets.isoflow.io/icons/storage/database.svg",
+      "category": "Database"
+    },
+    {
+      "id": "sqlite-icon",
+      "name": "SQLite Relacional",
+      "url": "https://assets.isoflow.io/icons/storage/storage.svg",
+      "category": "Database"
+    },
+    {
+      "id": "fastapi-icon",
+      "name": "FastAPI & Inferencia IA",
+      "url": "https://assets.isoflow.io/icons/services/server.svg",
+      "category": "Backend"
+    },
+    {
+      "id": "telegram-icon",
+      "name": "Bot Telegram",
+      "url": "https://assets.isoflow.io/icons/services/mail.svg",
+      "category": "Notifications"
+    },
+    {
+      "id": "grafana-icon",
+      "name": "Grafana Dashboards",
+      "url": "https://assets.isoflow.io/icons/services/desktop.svg",
+      "category": "Frontend"
+    },
+    {
+      "id": "web-icon",
+      "name": "Dashboard Web Interactivo",
+      "url": "https://assets.isoflow.io/icons/services/laptop.svg",
+      "category": "Frontend"
+    },
+    {
+      "id": "colab-icon",
+      "name": "Google Colab GPU",
+      "url": "https://assets.isoflow.io/icons/cloud/cloud.svg",
+      "category": "Cloud"
+    },
+    {
+      "id": "storage-icon",
+      "name": "Google Drive Models",
+      "url": "https://assets.isoflow.io/icons/storage/storage.svg",
+      "category": "Cloud"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "node-sensores",
+      "name": "Sensores Microclima (SHT31, DS18B20, Suelo, Lux)",
+      "icon": "sensor-icon",
+      "color": "green",
+      "position": {
+        "x": -12,
+        "y": 0
+      }
+    },
+    {
+      "id": "node-camara",
+      "name": "Cámara HD & Trampas Amarillas",
+      "icon": "camera-icon",
+      "color": "green",
+      "position": {
+        "x": -12,
+        "y": 4
+      }
+    },
+    {
+      "id": "node-actuadores",
+      "name": "Actuadores (SSR Calefactor 220V + Extractor PWM)",
+      "icon": "actuator-icon",
+      "color": "red",
+      "position": {
+        "x": -12,
+        "y": 8
+      }
+    },
+    {
+      "id": "node-esp32",
+      "name": "ESP32 Local (PID 10Hz + Filtro EMA/Hampel)",
+      "icon": "esp32-icon",
+      "color": "orange",
+      "position": {
+        "x": -3,
+        "y": 4
+      }
+    },
+    {
+      "id": "node-mosquitto",
+      "name": "Broker Mosquitto MQTT (:1883 / :9001)",
+      "icon": "mqtt-icon",
+      "color": "blue",
+      "position": {
+        "x": 4,
+        "y": 0
+      }
+    },
+    {
+      "id": "node-telegraf",
+      "name": "Telegraf Agent (Ingesta Automática)",
+      "icon": "telegraf-icon",
+      "color": "blue",
+      "position": {
+        "x": 8,
+        "y": -2
+      }
+    },
+    {
+      "id": "node-influxdb",
+      "name": "InfluxDB v2 (Series Temporales :8086)",
+      "icon": "influx-icon",
+      "color": "teal",
+      "position": {
+        "x": 10,
+        "y": 2
+      }
+    },
+    {
+      "id": "node-sqlite",
+      "name": "SQLite (Detecciones, Auditoría & Ensayos)",
+      "icon": "sqlite-icon",
+      "color": "teal",
+      "position": {
+        "x": 10,
+        "y": 6
+      }
+    },
+    {
+      "id": "node-fastapi",
+      "name": "FastAPI (YOLO26+SAHI, Riesgo & Lazo Externo)",
+      "icon": "fastapi-icon",
+      "color": "purple",
+      "position": {
+        "x": 5,
+        "y": 5
+      }
+    },
+    {
+      "id": "node-telegram",
+      "name": "Bot Telegram (Alertas Tempranas con Foto)",
+      "icon": "telegram-icon",
+      "color": "blue",
+      "position": {
+        "x": 4,
+        "y": 9
+      }
+    },
+    {
+      "id": "node-grafana",
+      "name": "Grafana Dashboard (:3000)",
+      "icon": "grafana-icon",
+      "color": "orange",
+      "position": {
+        "x": 16,
+        "y": 2
+      }
+    },
+    {
+      "id": "node-web",
+      "name": "Dashboard Web Interactivo (Streamlit / WS)",
+      "icon": "web-icon",
+      "color": "purple",
+      "position": {
+        "x": 16,
+        "y": 6
+      }
+    },
+    {
+      "id": "node-colab",
+      "name": "Google Colab (Entrenamiento Pesado GPU)",
+      "icon": "colab-icon",
+      "color": "yellow",
+      "position": {
+        "x": 3,
+        "y": -9
+      }
+    },
+    {
+      "id": "node-storage",
+      "name": "Google Drive / Models (.onnx / .pt)",
+      "icon": "storage-icon",
+      "color": "yellow",
+      "position": {
+        "x": 8,
+        "y": -9
+      }
+    }
+  ],
+  "connectors": [
+    {
+      "id": "conn-1",
+      "from": {
+        "node": "node-sensores"
+      },
+      "to": {
+        "node": "node-esp32"
+      },
+      "color": "green",
+      "style": "solid",
+      "label": "Lecturas I2C / 1-Wire / ADC (10 Hz)"
+    },
+    {
+      "id": "conn-2",
+      "from": {
+        "node": "node-esp32"
+      },
+      "to": {
+        "node": "node-actuadores"
+      },
+      "color": "red",
+      "style": "solid",
+      "label": "Split-Range (SSR 220V + Extractor PWM)"
+    },
+    {
+      "id": "conn-3",
+      "from": {
+        "node": "node-esp32"
+      },
+      "to": {
+        "node": "node-mosquitto"
+      },
+      "color": "blue",
+      "style": "solid",
+      "label": "MQTT Pub (Telemetría clima/pid)"
+    },
+    {
+      "id": "conn-4",
+      "from": {
+        "node": "node-mosquitto"
+      },
+      "to": {
+        "node": "node-esp32"
+      },
+      "color": "orange",
+      "style": "solid",
+      "label": "MQTT Sub (Setpoints & Ganancias)"
+    },
+    {
+      "id": "conn-5",
+      "from": {
+        "node": "node-camara"
+      },
+      "to": {
+        "node": "node-fastapi"
+      },
+      "color": "purple",
+      "style": "dashed",
+      "label": "Imágenes HD Follaje y Trampas"
+    },
+    {
+      "id": "conn-6",
+      "from": {
+        "node": "node-mosquitto"
+      },
+      "to": {
+        "node": "node-telegraf"
+      },
+      "color": "blue",
+      "style": "solid",
+      "label": "Suscripción Telemetría"
+    },
+    {
+      "id": "conn-7",
+      "from": {
+        "node": "node-telegraf"
+      },
+      "to": {
+        "node": "node-influxdb"
+      },
+      "color": "teal",
+      "style": "solid",
+      "label": "Line Protocol (HTTP InfluxDB)"
+    },
+    {
+      "id": "conn-8",
+      "from": {
+        "node": "node-mosquitto"
+      },
+      "to": {
+        "node": "node-fastapi"
+      },
+      "color": "blue",
+      "style": "solid",
+      "label": "MQTT Telemetría (Lazo Externo)"
+    },
+    {
+      "id": "conn-9",
+      "from": {
+        "node": "node-fastapi"
+      },
+      "to": {
+        "node": "node-mosquitto"
+      },
+      "color": "purple",
+      "style": "solid",
+      "label": "Ajuste Dinámico Setpoint (IA)"
+    },
+    {
+      "id": "conn-10",
+      "from": {
+        "node": "node-fastapi"
+      },
+      "to": {
+        "node": "node-sqlite"
+      },
+      "color": "teal",
+      "style": "solid",
+      "label": "BBoxes, Conteo y Auditoría"
+    },
+    {
+      "id": "conn-11",
+      "from": {
+        "node": "node-fastapi"
+      },
+      "to": {
+        "node": "node-telegram"
+      },
+      "color": "blue",
+      "style": "dashed",
+      "label": "Push Alerta con Foto y Riesgo"
+    },
+    {
+      "id": "conn-12",
+      "from": {
+        "node": "node-influxdb"
+      },
+      "to": {
+        "node": "node-grafana"
+      },
+      "color": "orange",
+      "style": "solid",
+      "label": "Consultas Flux (1 Hz)"
+    },
+    {
+      "id": "conn-13",
+      "from": {
+        "node": "node-influxdb"
+      },
+      "to": {
+        "node": "node-web"
+      },
+      "color": "teal",
+      "style": "solid",
+      "label": "Series Históricas Ensayos E1-E8"
+    },
+    {
+      "id": "conn-14",
+      "from": {
+        "node": "node-fastapi"
+      },
+      "to": {
+        "node": "node-web"
+      },
+      "color": "purple",
+      "style": "solid",
+      "label": "WebSockets en Vivo & Control PID"
+    },
+    {
+      "id": "conn-15",
+      "from": {
+        "node": "node-colab"
+      },
+      "to": {
+        "node": "node-storage"
+      },
+      "color": "yellow",
+      "style": "solid",
+      "label": "Exportación Pesos ONNX / PT"
+    },
+    {
+      "id": "conn-16",
+      "from": {
+        "node": "node-storage"
+      },
+      "to": {
+        "node": "node-fastapi"
+      },
+      "color": "yellow",
+      "style": "dashed",
+      "label": "Carga de Pesos Inferencia CPU"
+    }
+  ],
+  "rectangles": [
+    {
+      "id": "rect-invernadero",
+      "from": {
+        "x": -15,
+        "y": -2
+      },
+      "to": {
+        "x": -8,
+        "y": 11
+      },
+      "color": "green",
+      "label": "Invernadero Físico (La Paz ~3600m)"
+    },
+    {
+      "id": "rect-esp32",
+      "from": {
+        "x": -6,
+        "y": 1
+      },
+      "to": {
+        "x": 0,
+        "y": 7
+      },
+      "color": "orange",
+      "label": "Lazo Rápido Local (ESP32 a 10 Hz)"
+    },
+    {
+      "id": "rect-server",
+      "from": {
+        "x": 2,
+        "y": -4
+      },
+      "to": {
+        "x": 12,
+        "y": 11
+      },
+      "color": "blue",
+      "label": "Servidor Local (Docker Compose)"
+    },
+    {
+      "id": "rect-supervision",
+      "from": {
+        "x": 14,
+        "y": 0
+      },
+      "to": {
+        "x": 19,
+        "y": 8
+      },
+      "color": "purple",
+      "label": "Supervisión & Dashboards"
+    },
+    {
+      "id": "rect-cloud",
+      "from": {
+        "x": 1,
+        "y": -11
+      },
+      "to": {
+        "x": 10,
+        "y": -7
+      },
+      "color": "yellow",
+      "label": "Entrenamiento en Nube (Google Colab)"
+    }
+  ],
+  "textBoxes": [
+    {
+      "id": "tb-1",
+      "content": "Borde Físico / Sensores",
+      "fontSize": 0.6,
+      "orientation": "X",
+      "tile": {
+        "x": -12,
+        "y": -1
+      }
+    },
+    {
+      "id": "tb-2",
+      "content": "Control PID Autónomo",
+      "fontSize": 0.6,
+      "orientation": "X",
+      "tile": {
+        "x": -4,
+        "y": 2
+      }
+    },
+    {
+      "id": "tb-3",
+      "content": "Broker & Middleware",
+      "fontSize": 0.6,
+      "orientation": "X",
+      "tile": {
+        "x": 5,
+        "y": -3
+      }
+    },
+    {
+      "id": "tb-4",
+      "content": "Lazo Supervisor (IA)",
+      "fontSize": 0.6,
+      "orientation": "X",
+      "tile": {
+        "x": 5,
+        "y": 4
+      }
+    },
+    {
+      "id": "tb-5",
+      "content": "Monitoreo & Defensa",
+      "fontSize": 0.6,
+      "orientation": "X",
+      "tile": {
+        "x": 16,
+        "y": 1
+      }
+    }
+  ]
+}

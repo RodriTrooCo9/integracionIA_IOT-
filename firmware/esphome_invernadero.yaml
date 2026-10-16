@@ -1,0 +1,108 @@
+# ==============================================================================
+# Alternativa Declarativa: Configuración ESPHome para Control Invernadero Papa
+# Proyecto: Tesis IoT-PID-IA Papa (La Paz)
+# ==============================================================================
+
+esphome:
+  name: esp32-invernadero-papa
+  friendly_name: "ESP32 Invernadero Papa"
+
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+
+# Conectividad WiFi y Fallback
+wifi:
+  ssid: "Invernadero_WiFi_2.4G"
+  password: "TesisPapa2026!"
+  ap:
+    ssid: "ESP32_Invernadero_Fallback"
+    password: "EmergenciaTesis2026"
+
+captive_portal:
+
+# Broker MQTT
+mqtt:
+  broker: 192.168.1.100
+  port: 1883
+  topic_prefix: invernadero/esphome
+
+# Bus I2C para SHT31 y BH1750
+i2c:
+  sda: 21
+  scl: 22
+  scan: true
+
+# Bus OneWire para DS18B20
+dallas:
+  - pin: 4
+
+# Sensores
+sensor:
+  # 1. SHT31 - Temperatura y Humedad del Aire
+  - platform: sht3xd
+    temperature:
+      name: "Temperatura Aire SHT31"
+      id: temp_aire
+      filters:
+        - exponential_moving_average:
+            alpha: 0.15
+            send_every: 1
+    humidity:
+      name: "Humedad Aire SHT31"
+      id: hum_aire
+      filters:
+        - exponential_moving_average:
+            alpha: 0.15
+            send_every: 1
+    address: 0x44
+    update_interval: 1s
+
+  # 2. DS18B20 - Temperatura de Suelo
+  - platform: dallas
+    address: 0x0000000000000000 # Escaneo automático
+    name: "Temperatura Suelo DS18B20"
+    id: temp_suelo
+    update_interval: 2s
+
+  # 3. Sensor Capacitivo de Humedad de Suelo (ADC1_CH6)
+  - platform: adc
+    pin: 34
+    name: "Humedad Suelo Porcentaje"
+    id: hum_suelo
+    update_interval: 2s
+    filters:
+      - calibrate_linear:
+          - 3.1 -> 0.0    # Voltaje en aire seco = 0%
+          - 1.45 -> 100.0 # Voltaje en agua saturada = 100%
+
+# Salidas de Potencia
+output:
+  # A. SSR Calefactor (Modulación de tiempo lento)
+  - platform: slow_pwm
+    pin: 23
+    id: salida_calefactor_ssr
+    period: 2s
+
+  # B. Extractor Ventilador (PWM LEDC 25 kHz)
+  - platform: ledc
+    pin: 19
+    id: salida_extractor_pwm
+    frequency: 25000Hz
+
+# Controlador Climático PID Nativo de ESPHome
+climate:
+  - platform: pid
+    name: "Termostato PID Invernadero"
+    sensor: temp_aire
+    default_target_temperature: 20°C
+    heat_output: salida_calefactor_ssr
+    cool_output: salida_extractor_pwm
+    control_parameters:
+      kp: 0.065
+      ki: 0.0008
+      kd: 0.012
+      output_averaging_samples: 3
+    deadband_high: 0.3°C
+    deadband_low: 0.3°C

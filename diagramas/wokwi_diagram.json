@@ -1,0 +1,94 @@
+{
+  "version": 1,
+  "author": "Tesis IoT-PID-IA Papa La Paz",
+  "editor": "wokwi",
+  "parts": [
+    {
+      "type": "board-esp32-devkit-c-v4",
+      "id": "esp",
+      "top": -40,
+      "left": 0,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-ds18b20",
+      "id": "sensor_suelo_ds18b20",
+      "top": -140,
+      "left": 280,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r_pullup_ds18b20",
+      "top": -90,
+      "left": 240,
+      "attrs": { "value": "4700" }
+    },
+    {
+      "type": "wokwi-potentiometer",
+      "id": "pot_humedad_suelo",
+      "top": -30,
+      "left": 310,
+      "attrs": { "label": "Humedad Suelo Cap. (0-3.3V)" }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "led_ssr_calefactor",
+      "top": 240,
+      "left": -120,
+      "attrs": { "color": "red", "label": "SSR Calefactor (220V Time-PWM)" }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r_led_calefactor",
+      "top": 200,
+      "left": -100,
+      "attrs": { "value": "220" }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "led_extractor_pwm",
+      "top": 240,
+      "left": 120,
+      "attrs": { "color": "blue", "label": "Extractor PWM 12V (MOSFET)" }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r_led_extractor",
+      "top": 200,
+      "left": 100,
+      "attrs": { "value": "220" }
+    },
+    {
+      "type": "wokwi-relay-module",
+      "id": "modulo_rele_bomba",
+      "top": 280,
+      "left": 260,
+      "attrs": { "label": "Rele Bomba Riego" }
+    }
+  ],
+  "connections": [
+    [ "esp:GND.1", "led_ssr_calefactor:C", "black", [ "v20", "h-40" ] ],
+    [ "esp:23", "r_led_calefactor:1", "orange", [ "v15", "h-20" ] ],
+    [ "r_led_calefactor:2", "led_ssr_calefactor:A", "orange", [ "v0" ] ],
+
+    [ "esp:GND.1", "led_extractor_pwm:C", "black", [ "v20", "h40" ] ],
+    [ "esp:19", "r_led_extractor:1", "cyan", [ "v15", "h20" ] ],
+    [ "r_led_extractor:2", "led_extractor_pwm:A", "cyan", [ "v0" ] ],
+
+    [ "esp:3V3", "sensor_suelo_ds18b20:VCC", "red", [ "v-30", "h180" ] ],
+    [ "esp:GND.2", "sensor_suelo_ds18b20:GND", "black", [ "v-20", "h160" ] ],
+    [ "esp:4", "sensor_suelo_ds18b20:DQ", "gold", [ "v-15", "h140" ] ],
+    [ "sensor_suelo_ds18b20:VCC", "r_pullup_ds18b20:1", "red", [ "h-20" ] ],
+    [ "sensor_suelo_ds18b20:DQ", "r_pullup_ds18b20:2", "gold", [ "h-20" ] ],
+
+    [ "esp:3V3", "pot_humedad_suelo:VCC", "red", [ "v-30", "h220" ] ],
+    [ "esp:GND.2", "pot_humedad_suelo:GND", "black", [ "v-20", "h200" ] ],
+    [ "esp:34", "pot_humedad_suelo:SIG", "green", [ "v0" ] ],
+
+    [ "esp:5V", "modulo_rele_bomba:VCC", "red", [ "v40", "h160" ] ],
+    [ "esp:GND.1", "modulo_rele_bomba:GND", "black", [ "v50", "h150" ] ],
+    [ "esp:26", "modulo_rele_bomba:IN", "purple", [ "v30", "h130" ] ]
+  ],
+  "dependencies": {}
+}

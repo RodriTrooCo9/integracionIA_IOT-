@@ -1,0 +1,193 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "proyecto": "Prototipo IoT-PID-IA Papa bajo Invernadero (La Paz)",
+  "fase": "Fase 1: Hardware y Firmware del ESP32",
+  "version": "1.0.0",
+  "microcontrolador": {
+    "modelo": "ESP32 DevKit V1",
+    "pines_totales": 30,
+    "voltaje_operacion_v": 3.3,
+    "voltaje_alimentacion_vin_v": 5.0,
+    "wifi_banda_ghz": 2.4
+  },
+  "buses_alimentacion": [
+    {
+      "bus_id": "BUS_220VAC",
+      "voltaje": "220 V AC 50 Hz",
+      "descripcion": "Red eléctrica domiciliaria / industrial de La Paz para el calefactor",
+      "protecciones": ["Disyuntor termomagnético 10A", "Interruptor diferencial 30mA", "Fusible cerámico 5A"]
+    },
+    {
+      "bus_id": "BUS_12VDC",
+      "voltaje": "12 V DC",
+      "origen": "Fuente conmutada switching 12V 10A",
+      "descripcion": "Alimentación de ventiladores, electroválvula y bomba de agua",
+      "protecciones": ["Fusible 8A", "Diodos flyback 1N4007 en bobinas inductivas"]
+    },
+    {
+      "bus_id": "BUS_5VDC",
+      "voltaje": "5 V DC",
+      "origen": "Convertidor reductor buck DC-DC (LM2596) desde el BUS_12VDC",
+      "descripcion": "Alimentación del pin VIN del ESP32 y bobinas de módulos de relé",
+      "protecciones": ["Condensador electrolítico 470uF", "Condensador cerámico 100nF"]
+    },
+    {
+      "bus_id": "BUS_3V3DC",
+      "voltaje": "3.3 V DC",
+      "origen": "Regulador LDO integrado del ESP32 (pin 3V3)",
+      "descripcion": "Alimentación exclusiva de sensores (SHT31, DS18B20, BH1750, Suelo)",
+      "advertencia": "No conectar cargas > 250 mA para no recalentar el LDO"
+    }
+  ],
+  "sensores": [
+    {
+      "sensor_id": "SHT31_AIRE",
+      "modelo": "Sensirion SHT31-D",
+      "magnitudes": ["Temperatura del aire (°C)", "Humedad relativa (% HR)"],
+      "interfaz": "I2C",
+      "direccion_i2c": "0x44",
+      "conexiones": {
+        "VCC": "BUS_3V3DC",
+        "GND": "GND_COMUN",
+        "SDA": "GPIO_21",
+        "SCL": "GPIO_22"
+      },
+      "pull_up": "Resistencias de 4.7 kΩ a 3.3V en SDA y SCL",
+      "precision": "±0.3 °C, ±2 % HR"
+    },
+    {
+      "sensor_id": "DS18B20_SUELO",
+      "modelo": "Maxim Integrated DS18B20 Sumergible",
+      "magnitudes": ["Temperatura edáfica (°C)"],
+      "interfaz": "1-Wire",
+      "conexiones": {
+        "VCC": "BUS_3V3DC (Cable Rojo)",
+        "GND": "GND_COMUN (Cable Negro)",
+        "DATA": "GPIO_4 (Cable Amarillo)"
+      },
+      "pull_up": "Resistencia obligatoria de 4.7 kΩ entre DATA (GPIO_4) y 3.3V",
+      "encapsulado": "Sonda de acero inoxidable impermeable IP68"
+    },
+    {
+      "sensor_id": "SUELO_CAPACITIVO",
+      "modelo": "Capacitive Soil Moisture Sensor v1.2",
+      "magnitudes": ["Humedad volumétrica de sustrato (%)"],
+      "interfaz": "Analógica (ADC)",
+      "conexiones": {
+        "VCC": "BUS_3V3DC",
+        "GND": "GND_COMUN",
+        "AOUT": "GPIO_34"
+      },
+      "justificacion_pin": "GPIO_34 pertenece al bloque ADC1 (ADC1_CH6). Funciona con WiFi activo sin interferencia.",
+      "calibracion_mv": {
+        "aire_seco": 2900,
+        "agua_saturada": 1350
+      }
+    },
+    {
+      "sensor_id": "BH1750_LUZ",
+      "modelo": "Rohm BH1750FVI",
+      "magnitudes": ["Iluminancia fotosintética (Lux)"],
+      "interfaz": "I2C",
+      "direccion_i2c": "0x23 (ADDR conectado a GND)",
+      "conexiones": {
+        "VCC": "BUS_3V3DC",
+        "GND": "GND_COMUN",
+        "SDA": "GPIO_21",
+        "SCL": "GPIO_22",
+        "ADDR": "GND_COMUN"
+      }
+    },
+    {
+      "sensor_id": "NIVEL_AGUA",
+      "modelo": "Sensor de boya / flotador magnético reed switch",
+      "magnitudes": ["Nivel crítico de reserva de agua (Booleano)"],
+      "interfaz": "Digital Input",
+      "conexiones": {
+        "TERMINAL_1": "GND_COMUN",
+        "TERMINAL_2": "GPIO_35"
+      },
+      "pull_up": "Resistencia externa de 10 kΩ a 3.3V (GPIO_35 no posee pull-up interna)"
+    }
+  ],
+  "actuadores_y_etapa_potencia": [
+    {
+      "actuador_id": "CALEFACTOR_SSR",
+      "tipo_carga": "Resistencia calefactora cerámica 220V AC (300 W - 500 W)",
+      "elemento_conmutacion": "Relé de Estado Sólido (SSR) Fototriac Zero-Cross (Fotek SSR-25DA)",
+      "aislamiento": "Optoaislamiento galvánico de 4000 V integrado",
+      "estrategia_control": "PWM por modulación de ancho de pulso en ventana de tiempo (Time-Proportional, ventana de 2000 ms)",
+      "conexiones": {
+        "INPUT_POSITIVO": "GPIO_23",
+        "INPUT_NEGATIVO": "GND_COMUN",
+        "OUTPUT_L1": "Línea Fase 220V AC (con fusible en serie)",
+        "OUTPUT_L2": "Borne Entrada Calefactor",
+        "RETORNO_CALEFACTOR": "Neutro 220V AC"
+      },
+      "disipacion": "Disipador de aluminio acanalado montado con pasta térmica"
+    },
+    {
+      "actuador_id": "EXTRACTOR_PWM",
+      "tipo_carga": "Ventilador extractor tipo turbina / axial 12V DC (1.5 A)",
+      "elemento_conmutacion": "Módulo MOSFET de potencia Logic-Level (IRLZ44N o LR7843)",
+      "frecuencia_pwm_khz": 25,
+      "estrategia_control": "PWM continuo de alta frecuencia (Canal LEDC ESP32, 8 bits: 0 a 255)",
+      "conexiones": {
+        "GATE_SIG": "GPIO_19 (a través de resistencia de compuerta de 100 Ω)",
+        "GATE_GND": "GND_COMUN (resistencia pulldown de 10 kΩ a GND para asegurar apagado en reset)",
+        "VIN_CARGA": "BUS_12VDC",
+        "DRAIN_CARGA_NEG": "Terminal negativo del ventilador",
+        "DIODO_PROTECCION": "Diodo 1N5819 Schottky en antiparalelo con la carga"
+      }
+    },
+    {
+      "actuador_id": "HUMIDIFICADOR_ULTRASONICO",
+      "tipo_carga": "Nebulizador / Humidificador ultrasónico 24V DC / 220V AC",
+      "elemento_conmutacion": "Módulo relé electromecánico con optoacoplador (Canal 1)",
+      "logica_disparo": "Activo en BAJO (Active-LOW)",
+      "conexiones": {
+        "IN1": "GPIO_18",
+        "VCC_RELE": "BUS_5VDC",
+        "GND_RELE": "GND_COMUN"
+      }
+    },
+    {
+      "actuador_id": "BOMBA_RIEGO",
+      "tipo_carga": "Bomba diafragma sumergible 12V DC (riego por goteo localizado)",
+      "elemento_conmutacion": "Módulo relé electromecánico con optoacoplador (Canal 2)",
+      "logica_disparo": "Activo en BAJO (Active-LOW)",
+      "conexiones": {
+        "IN2": "GPIO_26",
+        "VCC_RELE": "BUS_5VDC",
+        "GND_RELE": "GND_COMUN",
+        "FLYBACK": "Diodo 1N4007 colocado en paralelo con la bomba (cátodo a +12V, ánodo a GND de retorno)"
+      }
+    },
+    {
+      "actuador_id": "LED_ESTADO_SISTEMA",
+      "tipo_carga": "LED de diagnóstico integrado en la placa",
+      "conexiones": {
+        "PIN": "GPIO_2"
+      },
+      "patron_blink": "1 Hz normal, 5 Hz alerta/error de sensor, Fijo si pierde conexión WiFi/MQTT"
+    }
+  ],
+  "tabla_mapeo_pines_esp32": [
+    {"pin": "GPIO_21", "funcion": "I2C SDA", "dispositivos": "SHT31 (0x44), BH1750 (0x23)", "pullup": "4.7kΩ externo a 3.3V"},
+    {"pin": "GPIO_22", "funcion": "I2C SCL", "dispositivos": "SHT31 (0x44), BH1750 (0x23)", "pullup": "4.7kΩ externo a 3.3V"},
+    {"pin": "GPIO_4",  "funcion": "1-Wire Bus", "dispositivos": "DS18B20 Temp Suelo", "pullup": "4.7kΩ externo a 3.3V"},
+    {"pin": "GPIO_34", "funcion": "ADC1_CH6 Entrada", "dispositivos": "Sensor Capacitivo de Suelo v1.2", "rango": "0 - 3.3V"},
+    {"pin": "GPIO_35", "funcion": "Digital IN (Solo Entrada)", "dispositivos": "Flotador Nivel Tanque", "pullup": "10kΩ externo a 3.3V"},
+    {"pin": "GPIO_23", "funcion": "Digital OUT (Time-PWM)", "dispositivos": "Control SSR Calefactor 220V", "aislamiento": "Optoacoplador SSR"},
+    {"pin": "GPIO_19", "funcion": "PWM 25 kHz (LEDC)", "dispositivos": "Driver MOSFET Extractor 12V", "circuito": "Gate R=100Ω + Pulldown 10kΩ"},
+    {"pin": "GPIO_18", "funcion": "Digital OUT (Active LOW)", "dispositivos": "Canal 1 Módulo Relé (Humidificador)", "aislamiento": "Optoacoplador relé"},
+    {"pin": "GPIO_26", "funcion": "Digital OUT (Active LOW)", "dispositivos": "Canal 2 Módulo Relé (Bomba Riego)", "aislamiento": "Optoacoplador relé"},
+    {"pin": "GPIO_2",  "funcion": "Digital OUT", "dispositivos": "LED de Diagnóstico Onboard", "frecuencia": "Heartbeat"}
+  ],
+  "advertencias_de_seguridad_electrica": [
+    "SEPARACIÓN FÍSICA: Mantener al menos 5 cm de distancia en el cuadro eléctrico entre los cables de 220V AC y los cables de baja tensión (3.3V / 12V DC).",
+    "PUESTA A TIERRA: La carcasa metálica y chasis del invernadero deben estar sólidamente conectados a la toma de tierra física de la instalación eléctrica.",
+    "TIERRAS COMUNES DC: La tierra (GND) de la fuente de 12V, del convertidor buck de 5V y del ESP32 deben unirse en un único punto estrella para evitar bucles de masa.",
+    "BARRERA DE VOLTAJE: Bajo ninguna circunstancia introducir 5V o 12V en los pines GPIO del ESP32, ya que causará la destrucción irreversible del microcontrolador (máximo tolerado: 3.6 V)."
+  ]
+}
