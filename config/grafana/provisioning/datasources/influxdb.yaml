@@ -1,0 +1,16 @@
+apiVersion: 1
+
+datasources:
+  - name: InfluxDB_v2
+    type: influxdb
+    access: proxy
+    url: http://influxdb:8086
+    jsonData:
+      version: Flux
+      organization: agri_iot_tesis
+      defaultBucket: invernadero_data
+      tlsSkipVerify: true
+    secureJsonData:
+      token: my-super-secret-admin-auth-token-tesis-2026-lapaz-bolivia
+    isDefault: true
+    editable: true

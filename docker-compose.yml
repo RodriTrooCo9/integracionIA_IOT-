@@ -1,0 +1,111 @@
+# ==============================================================================
+# Docker Compose: Infraestructura IoT Base (Tesis Papa La Paz)
+# Servicios: Mosquitto Broker + InfluxDB v2 + Telegraf + Grafana
+# ==============================================================================
+
+services:
+  # ----------------------------------------------------------------------------
+  # 1. Eclipse Mosquitto: Broker MQTT para telemetría y control
+  # ----------------------------------------------------------------------------
+  mosquitto:
+    image: eclipse-mosquitto:2.0.18
+    container_name: iot_mosquitto
+    restart: unless-stopped
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - ./config/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - mosquitto_data:/mosquitto/data
+      - mosquitto_log:/mosquitto/log
+    networks:
+      - red_invernadero
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 2 nc -z localhost 1883 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ----------------------------------------------------------------------------
+  # 2. InfluxDB v2: Almacenamiento optimizado de series de tiempo microclimáticas
+  # ----------------------------------------------------------------------------
+  influxdb:
+    image: influxdb:2.7.5-alpine
+    container_name: iot_influxdb
+    restart: unless-stopped
+    ports:
+      - "8086:8086"
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=${INFLUXDB_USERNAME:-admin_invernadero}
+      - DOCKER_INFLUXDB_INIT_PASSWORD=${INFLUXDB_PASSWORD:-TesisPapaPass2026!}
+      - DOCKER_INFLUXDB_INIT_ORG=${INFLUXDB_ORG:-agri_iot_tesis}
+      - DOCKER_INFLUXDB_INIT_BUCKET=${INFLUXDB_BUCKET:-invernadero_data}
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=${INFLUXDB_TOKEN:-my-super-secret-admin-auth-token-tesis-2026-lapaz-bolivia}
+    volumes:
+      - influxdb_data:/var/lib/influxdb2
+    networks:
+      - red_invernadero
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8086/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ----------------------------------------------------------------------------
+  # 3. Telegraf: Agente de ingesta automática (Suscripción MQTT -> InfluxDB v2)
+  # ----------------------------------------------------------------------------
+  telegraf:
+    image: telegraf:1.30.0-alpine
+    container_name: iot_telegraf
+    restart: unless-stopped
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+      influxdb:
+        condition: service_healthy
+    environment:
+      - INFLUXDB_TOKEN=${INFLUXDB_TOKEN:-my-super-secret-admin-auth-token-tesis-2026-lapaz-bolivia}
+      - INFLUXDB_ORG=${INFLUXDB_ORG:-agri_iot_tesis}
+      - INFLUXDB_BUCKET=${INFLUXDB_BUCKET:-invernadero_data}
+    volumes:
+      - ./config/telegraf/telegraf.conf:/etc/telegraf/telegraf.conf:ro
+    networks:
+      - red_invernadero
+
+  # ----------------------------------------------------------------------------
+  # 4. Grafana: Visualización analítica de microclima y control PID
+  # ----------------------------------------------------------------------------
+  grafana:
+    image: grafana/grafana:10.4.1
+    container_name: iot_grafana
+    restart: unless-stopped
+    depends_on:
+      influxdb:
+        condition: service_healthy
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin_tesis_grafana}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./config/grafana/provisioning:/etc/grafana/provisioning:ro
+    networks:
+      - red_invernadero
+
+networks:
+  red_invernadero:
+    name: net_invernadero_iot
+    driver: bridge
+
+volumes:
+  mosquitto_data:
+    name: vol_mosquitto_data
+  mosquitto_log:
+    name: vol_mosquitto_log
+  influxdb_data:
+    name: vol_influxdb_data
+  grafana_data:
+    name: vol_grafana_data

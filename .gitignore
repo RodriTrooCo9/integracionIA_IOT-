@@ -1,0 +1,97 @@
+# ==========================================
+# .gitignore - Proyecto Tesis IoT-PID-IA Papa
+# ==========================================
+
+# Entornos virtuales de Python
+venv/
+.venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Bytecode y caches de Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+
+# Jupyter Notebooks y Colab
+.ipynb_checkpoints
+*/.ipynb_checkpoints/*
+
+# PlatformIO y Sistemas Embebidos
+.pio/
+.pioenvs/
+.piolibdeps/
+.clang_complete
+.gcc-flags.json
+
+# Entornos de desarrollo y editores
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+.DS_Store
+Thumbs.db
+*~
+*.swp
+
+# Secretos y variables de entorno
+.env
+.env.local
+.env.*.local
+secrets.env
+*.pem
+*.key
+
+# Bases de datos y archivos de persistencia local
+*.sqlite
+*.sqlite3
+*.db
+server/data/*.db
+
+# Volúmenes persistentes de Docker (para InfluxDB, Grafana, Mosquitto)
+volumes/
+data_volumes/
+mosquitto/data/
+mosquitto/log/
+influxdb_data/
+grafana_data/
+
+# Datasets masivos y Pesos de Redes Neuronales (pesados para git)
+# Mantener solo los scripts y .gitkeep
+data/raw/*
+!data/raw/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+data/models/*
+!data/models/.gitkeep
+data/synthetic/*
+!data/synthetic/.gitkeep
+
+# Pesos de modelos de Deep Learning
+*.pt
+*.pth
+*.onnx
+*.engine
+*.tflite
+*.weights
+runs/
+wandb/
+mlruns/
+
+# Archivos temporales de compilación y LaTeX
+thesis/*.aux
+thesis/*.bbl
+thesis/*.blg
+thesis/*.log
+thesis/*.out
+thesis/*.toc
+thesis/*.synctex.gz
+thesis/*.fls
+thesis/*.fdb_latexmk
