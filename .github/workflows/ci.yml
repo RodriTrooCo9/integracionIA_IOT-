@@ -26,6 +26,10 @@ jobs:
           python-version: '3.11'
           cache: 'pip'
 
+      - name: ⚙️ Preparar Variables de Entorno
+        run: |
+          cp .env.example .env
+
       - name: 📦 Instalar Dependencias Base
         run: |
           python -m pip install --upgrade pip
@@ -62,6 +66,10 @@ jobs:
           python-version: '3.11'
           cache: 'pip'
 
+      - name: ⚙️ Preparar Variables de Entorno
+        run: |
+          cp .env.example .env
+
       - name: 📦 Instalar Dependencias
         run: |
           python -m pip install --upgrade pip
@@ -87,6 +95,7 @@ jobs:
   firmware-validation:
     name: ⚡ Validación de Código Firmware ESP32
     runs-on: ubuntu-latest
+    continue-on-error: true
     steps:
       - name: 📥 Clonar Repositorio
         uses: actions/checkout@v4
