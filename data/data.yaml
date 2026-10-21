@@ -1,0 +1,12 @@
+path: /home/rodrigo/Desktop/IOTtesis/data/dataset_yolo
+train: images/train
+val: images/val
+test: images/test
+nc: 6
+names:
+  0: tizon_tardio
+  1: tizon_temprano
+  2: hoja_sana
+  3: mosca_minadora
+  4: pulgon
+  5: polilla_papa

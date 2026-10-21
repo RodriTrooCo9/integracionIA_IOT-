@@ -73,6 +73,7 @@ data/models/*
 !data/models/.gitkeep
 data/synthetic/*
 !data/synthetic/.gitkeep
+data/dataset_yolo/
 
 # Pesos de modelos de Deep Learning
 *.pt
@@ -95,3 +96,6 @@ thesis/*.toc
 thesis/*.synctex.gz
 thesis/*.fls
 thesis/*.fdb_latexmk
+
+# Registro interno de fases (ignorado para git)
+fases/

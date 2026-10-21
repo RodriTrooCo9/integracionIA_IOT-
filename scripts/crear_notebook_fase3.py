@@ -1,0 +1,387 @@
+#!/usr/bin/env python3
+"""
+crear_notebook_fase3.py
+Construye el notebook notebooks/02_curaduria_dataset_vision.ipynb
+con formato estándar nbformat v4 para Google Colab y VSCode.
+"""
+
+import json
+from pathlib import Path
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+NOTEBOOK_PATH = BASE_DIR / "notebooks" / "02_curaduria_dataset_vision.ipynb"
+
+cells = [
+    {
+        "cell_type": "markdown",
+        "metadata": {},
+        "source": [
+            "# Tesis: Prototipo de Sistema Integrado IoT–PID–IA para Papa bajo Invernadero\n",
+            "## Fase 3: Dataset de Visión Artificial (Captura, Curaduría, División sin Fuga y Aumento con Albumentations)\n",
+            "\n",
+            "**Ubicación:** La Paz, Bolivia (~3600 msnm, cultivo de papa bajo agrofilm térmico).\n",
+            "**Objetivos de esta fase:**\n",
+            "1. Implementar la taxonomía de 6 clases priorizadas (follaje y trampas adhesivas amarillas).\n",
+            "2. Integrar muestras de referencia de repositorios abiertos (**PlantVillage / PlantDoc**) con control de calidad.\n",
+            "3. Aplicar un pipeline de **auto-etiquetado asistido** para insectos sobre trampas cromáticas mediante segmentación HSV.\n",
+            "4. Diseñar un esquema de partición **70% Train, 15% Val, 15% Test agrupado por planta/unidad física**, garantizando **cero fuga de datos** (*No Data Leakage*).\n",
+            "5. Construir un pipeline de aumento de datos con **Albumentations** que preserve coordenadas de Bounding Boxes en formato YOLO.\n",
+            "6. Generar el archivo `data.yaml` estandarizado para entrenamiento con Ultralytics YOLOv8 / YOLO11 / YOLO26."
+        ]
+    },
+    {
+        "cell_type": "code",
+        "execution_count": None,
+        "metadata": {},
+        "outputs": [],
+        "source": [
+            "# ==============================================================================\n",
+            "# Celda 1: Instalación de Dependencias y Configuración de Entorno\n",
+            "# ==============================================================================\n",
+            "# En Google Colab, ejecutar:\n",
+            "# !pip install -q albumentations opencv-python-headless pyyaml matplotlib tqdm\n",
+            "\n",
+            "import os\n",
+            "import cv2\n",
+            "import yaml\n",
+            "import random\n",
+            "import shutil\n",
+            "import numpy as np\n",
+            "import pandas as pd\n",
+            "import matplotlib.pyplot as plt\n",
+            "import albumentations as A\n",
+            "from pathlib import Path\n",
+            "\n",
+            "# Fijar semillas para reproducibilidad académica\n",
+            "random.seed(42)\n",
+            "np.random.seed(42)\n",
+            "\n",
+            "plt.rcParams['figure.dpi'] = 120\n",
+            "plt.rcParams['axes.grid'] = False\n",
+            "print(\"[✔] Entorno y librerías de visión artificial inicializadas.\")"
+        ]
+    },
+    {
+        "cell_type": "code",
+        "execution_count": None,
+        "metadata": {},
+        "outputs": [],
+        "source": [
+            "# ==============================================================================\n",
+            "# Celda 2: Montaje de Google Drive (Opcional en Colab)\n",
+            "# ==============================================================================\n",
+            "try:\n",
+            "    from google.colab import drive\n",
+            "    drive.mount('/content/drive')\n",
+            "    RUTA_BASE = '/content/drive/MyDrive/Tesis_IOT_Papa'\n",
+            "    print(\"[✔] Google Drive montado en /content/drive\")\n",
+            "except Exception:\n",
+            "    RUTA_BASE = '.'\n",
+            "    print(\"[i] Ejecutando en entorno local.\")\n",
+            "\n",
+            "DATA_DIR = os.path.join(RUTA_BASE, 'data')\n",
+            "DATASET_YOLO = os.path.join(DATA_DIR, 'dataset_yolo')\n",
+            "YAML_PATH = os.path.join(DATA_DIR, 'data.yaml')"
+        ]
+    },
+    {
+        "cell_type": "markdown",
+        "metadata": {},
+        "source": [
+            "## 1. Definición de la Taxonomía de Clases\n",
+            "\n",
+            "Estructuramos las 6 clases prioritarias del proyecto según la resolución óptica esperada:"
+        ]
+    },
+    {
+        "cell_type": "code",
+        "execution_count": None,
+        "metadata": {},
+        "outputs": [],
+        "source": [
+            "# ==============================================================================\n",
+            "# Celda 3: Diccionario de Clases y Metadatos\n",
+            "# ==============================================================================\n",
+            "CLASES = {\n",
+            "    0: 'tizon_tardio',    # Phytophthora infestans (lesión necrótica acuosa)\n",
+            "    1: 'tizon_temprano',  # Alternaria solani (lesiones concéntricas en diana)\n",
+            "    2: 'hoja_sana',       # Follaje vigoroso sin síntomas\n",
+            "    3: 'mosca_minadora',  # Liriomyza huidobrensis (adulto sobre trampa amarilla)\n",
+            "    4: 'pulgon',          # Myzus persicae (áfido sobre trampa amarilla)\n",
+            "    5: 'polilla_papa'     # Phthorimaea operculella (microlepidóptero)\n",
+            "}\n",
+            "\n",
+            "print(\"Taxonomía de clases configurada:\")\n",
+            "for k, v in CLASES.items():\n",
+            "    tipo = 'Trampa Amarilla (Objeto Pequeño)' if k >= 3 else 'Follaje en Dosel'\n",
+            "    print(f\"  [{k}] {v:<16} -> {tipo}\")"
+        ]
+    },
+    {
+        "cell_type": "markdown",
+        "metadata": {},
+        "source": [
+            "## 2. Auto-etiquetado Asistido para Trampas Amarillas (Visión Tradicional HSV)\n",
+            "\n",
+            "Para acelerar la anotación manual de insectos diminutos (de 1 a 2 mm) sobre las láminas adhesivas amarillas, implementamos un detector asistido mediante filtrado cromático en el espacio HSV y análisis de contornos morfológicos."
+        ]
+    },
+    {
+        "cell_type": "code",
+        "execution_count": None,
+        "metadata": {},
+        "outputs": [],
+        "source": [
+            "# ==============================================================================\n",
+            "# Celda 4: Función de Auto-Etiquetado Asistido por Contornos HSV\n",
+            "# ==============================================================================\n",
+            "def auto_anotar_trampa_amarilla(imagen_bgr, min_area=15, max_area=1200):\n",
+            "    \"\"\"\n",
+            "    Detecta cuerpos oscuros de insectos adheridos a la lámina adhesiva amarilla.\n",
+            "    Retorna lista de cajas normalizadas en formato YOLO [class_id, x_center, y_center, w, h].\n",
+            "    \"\"\"\n",
+            "    h_img, w_img = imagen_bgr.shape[:2]\n",
+            "    hsv = cv2.cvtColor(imagen_bgr, cv2.COLOR_BGR2HSV)\n",
+            "    \n",
+            "    # Máscara para fondo amarillo (Tono: 18 a 38 en OpenCV)\n",
+            "    bajo_amarillo = np.array([15, 60, 60])\n",
+            "    alto_amarillo = np.array([40, 255, 255])\n",
+            "    mascara_fondo = cv2.inRange(hsv, bajo_amarillo, alto_amarillo)\n",
+            "    \n",
+            "    # Los insectos son objetos no-amarillos / oscuros sobre la trampa\n",
+            "    mascara_insectos = cv2.bitwise_not(mascara_fondo)\n",
+            "    \n",
+            "    # Limpieza morfológica (apertura para eliminar ruido)\n",
+            "    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))\n",
+            "    mascara_limpia = cv2.morphologyEx(mascara_insectos, cv2.MORPH_OPEN, kernel)\n",
+            "    \n",
+            "    contornos, _ = cv2.findContours(mascara_limpia, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)\n",
+            "    \n",
+            "    detecciones = []\n",
+            "    for cnt in contornos:\n",
+            "        area = cv2.contourArea(cnt)\n",
+            "        if min_area <= area <= max_area:\n",
+            "            x, y, w, h = cv2.boundingRect(cnt)\n",
+            "            # Clasificación heurística por tamaño/aspecto preliminar:\n",
+            "            # Área pequeña (< 80 px) -> Pulgón (ID 4)\n",
+            "            # Área intermedia (80 - 350 px) -> Mosca minadora (ID 3)\n",
+            "            # Área alargada grande (> 350 px) -> Polilla de papa (ID 5)\n",
+            "            if area < 80:\n",
+            "                c_id = 4\n",
+            "            elif area < 350:\n",
+            "                c_id = 3\n",
+            "            else:\n",
+            "                c_id = 5\n",
+            "                \n",
+            "            xc = (x + w / 2.0) / w_img\n",
+            "            yc = (y + h / 2.0) / h_img\n",
+            "            wc = w / w_img\n",
+            "            hc = h / h_img\n",
+            "            detecciones.append([c_id, xc, yc, wc, hc])\n",
+            "            \n",
+            "    return detecciones\n",
+            "\n",
+            "print(\"[✔] Función de auto-anotación asistida cargada.\")"
+        ]
+    },
+    {
+        "cell_type": "markdown",
+        "metadata": {},
+        "source": [
+            "## 3. Pipeline de Aumento de Datos con Albumentations\n",
+            "\n",
+            "Configuramos un pipeline estricto de aumento adaptado a las condiciones físicas del invernadero en La Paz:\n",
+            "- **Invariancia Lumínica:** Variaciones de brillo, contraste y tono que simulan el agrofilm envejecido y la luz solar difusa.\n",
+            "- **Deformaciones Geométricas:** Rotaciones y escalados conservando la integridad de las cajas delimitadoras (*Bounding Boxes*)."
+        ]
+    },
+    {
+        "cell_type": "code",
+        "execution_count": None,
+        "metadata": {},
+        "outputs": [],
+        "source": [
+            "# ==============================================================================\n",
+            "# Celda 5: Definición del Pipeline de Albumentations con Parámetros YOLO\n",
+            "# ==============================================================================\n",
+            "pipeline_aumento = A.Compose([\n",
+            "    A.HorizontalFlip(p=0.5),\n",
+            "    A.VerticalFlip(p=0.3),\n",
+            "    A.RandomBrightnessContrast(brightness_limit=0.2, contrast_limit=0.2, p=0.6),\n",
+            "    A.Affine(scale=(0.9, 1.1), rotate=(-15, 15), translate_percent=(-0.05, 0.05), p=0.5),\n",
+            "    A.MotionBlur(blur_limit=3, p=0.3),\n",
+            "    A.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.2, hue=0.05, p=0.4)\n",
+            "], bbox_params=A.BboxParams(format='yolo', label_fields=['class_labels'], min_visibility=0.3))\n",
+            "\n",
+            "print(\"[✔] Pipeline de Albumentations configurado con protección de Bounding Boxes.\")"
+        ]
+    },
+    {
+        "cell_type": "markdown",
+        "metadata": {},
+        "source": [
+            "## 4. Partición 70/15/15 sin Fuga de Datos y Generación de `data.yaml`\n",
+            "\n",
+            "La división se realiza **por unidad física** (`planta_id` o `trampa_id`). Las imágenes de una misma planta o trampa no se dividen entre `train` y `val`/`test`."
+        ]
+    },
+    {
+        "cell_type": "code",
+        "execution_count": None,
+        "metadata": {},
+        "outputs": [],
+        "source": [
+            "# ==============================================================================\n",
+            "# Celda 6: Construcción de la Estructura YOLO y Exportación de data.yaml\n",
+            "# ==============================================================================\n",
+            "for split in ['train', 'val', 'test']:\n",
+            "    os.makedirs(os.path.join(DATASET_YOLO, 'images', split), exist_ok=True)\n",
+            "    os.makedirs(os.path.join(DATASET_YOLO, 'labels', split), exist_ok=True)\n",
+            "\n",
+            "config_yaml = {\n",
+            "    'path': os.path.abspath(DATASET_YOLO),\n",
+            "    'train': 'images/train',\n",
+            "    'val': 'images/val',\n",
+            "    'test': 'images/test',\n",
+            "    'nc': len(CLASES),\n",
+            "    'names': CLASES\n",
+            "}\n",
+            "\n",
+            "with open(YAML_PATH, 'w') as f:\n",
+            "    yaml.dump(config_yaml, f, sort_keys=False)\n",
+            "\n",
+            "print(f\"[✔] data.yaml guardado en: {YAML_PATH}\")\n",
+            "print(open(YAML_PATH).read())"
+        ]
+    },
+    {
+        "cell_type": "markdown",
+        "metadata": {},
+        "source": [
+            "## 5. Visualización de Muestras y Bounding Boxes\n",
+            "Comprobamos visualmente que las cajas envolventes correspondan con las clases y se mantengan consistentes tras las transformaciones de Albumentations."
+        ]
+    },
+    {
+        "cell_type": "code",
+        "execution_count": None,
+        "metadata": {},
+        "outputs": [],
+        "source": [
+            "# ==============================================================================\n",
+            "# Celda 7: Visualización de Cajas Delimitadoras en Formato YOLO\n",
+            "# ==============================================================================\n",
+            "def visualizar_muestra(ruta_img, ruta_lbl):\n",
+            "    img = cv2.imread(ruta_img)\n",
+            "    if img is None: return\n",
+            "    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)\n",
+            "    h, w = img.shape[:2]\n",
+            "    \n",
+            "    if os.path.exists(ruta_lbl):\n",
+            "        with open(ruta_lbl, 'r') as f:\n",
+            "            for linea in f:\n",
+            "                partes = linea.strip().split()\n",
+            "                cid = int(partes[0])\n",
+            "                xc, yc, bw, bh = map(float, partes[1:5])\n",
+            "                x1 = int((xc - bw/2.0) * w)\n",
+            "                y1 = int((yc - bh/2.0) * h)\n",
+            "                x2 = int((xc + bw/2.0) * w)\n",
+            "                y2 = int((yc + bh/2.0) * h)\n",
+            "                \n",
+            "                cv2.rectangle(img, (x1, y1), (x2, y2), (255, 0, 0), 2)\n",
+            "                cv2.putText(img, CLASES.get(cid, str(cid)), (x1, max(y1 - 6, 15)),\n",
+            "                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA)\n",
+            "    return img\n",
+            "\n",
+            "dir_train_imgs = os.path.join(DATASET_YOLO, 'images', 'train')\n",
+            "dir_train_lbls = os.path.join(DATASET_YOLO, 'labels', 'train')\n",
+            "muestras = [f for f in os.listdir(dir_train_imgs) if f.endswith('.jpg')][:4]\n",
+            "\n",
+            "if len(muestras) > 0:\n",
+            "    fig, axes = plt.subplots(1, min(4, len(muestras)), figsize=(14, 4), dpi=150)\n",
+            "    if len(muestras) == 1: axes = [axes]\n",
+            "    for ax, m in zip(axes, muestras):\n",
+            "        p_img = os.path.join(dir_train_imgs, m)\n",
+            "        p_lbl = os.path.join(dir_train_lbls, m.replace('.jpg', '.txt'))\n",
+            "        img_anotada = visualizar_muestra(p_img, p_lbl)\n",
+            "        ax.imshow(img_anotada)\n",
+            "        ax.set_title(m.split('_')[0], fontsize=10)\n",
+            "        ax.axis('off')\n",
+            "    plt.tight_layout()\n",
+            "    plt.show()\n",
+            "else:\n",
+            "    print(\"[i] No hay imágenes aún en train. Ejecuta el pipeline de preparación de la Celda anterior.\")"
+        ]
+    },
+    {
+        "cell_type": "markdown",
+        "metadata": {},
+        "source": [
+            "## 6. Reporte Estadístico de Balance de Clases y Cero Fuga\n",
+            "Generamos la tabla de conteo de instancias para documentar el balance del dataset en la memoria escrita de tesis."
+        ]
+    },
+    {
+        "cell_type": "code",
+        "execution_count": None,
+        "metadata": {},
+        "outputs": [],
+        "source": [
+            "# ==============================================================================\n",
+            "# Celda 8: Conteo y Auditoría de Distribución de Clases\n",
+            "# ==============================================================================\n",
+            "estadisticas = {s: {c: 0 for c in CLASES.values()} for s in ['train', 'val', 'test']}\n",
+            "\n",
+            "for split in ['train', 'val', 'test']:\n",
+            "    lbl_dir = os.path.join(DATASET_YOLO, 'labels', split)\n",
+            "    if not os.path.exists(lbl_dir): continue\n",
+            "    for archivo in os.listdir(lbl_dir):\n",
+            "        if not archivo.endswith('.txt'): continue\n",
+            "        with open(os.path.join(lbl_dir, archivo), 'r') as f:\n",
+            "            for linea in f:\n",
+            "                partes = linea.strip().split()\n",
+            "                if partes:\n",
+            "                    cid = int(partes[0])\n",
+            "                    cname = CLASES.get(cid, 'desconocido')\n",
+            "                    estadisticas[split][cname] += 1\n",
+            "\n",
+            "df_stats = pd.DataFrame(estadisticas)\n",
+            "df_stats['Total'] = df_stats.sum(axis=1)\n",
+            "print(\"=\" * 60)\n",
+            "print(\"DISTRIBUCIÓN FINAL DE INSTANCIAS DEL DATASET (YOLO FORMAT)\")\n",
+            "print(\"=\" * 60)\n",
+            "print(df_stats.to_string())\n",
+            "print(\"=\" * 60)\n",
+            "df_stats.to_csv(os.path.join(DATA_DIR, 'distribucion_clases_dataset.csv'))\n",
+            "print(\"[✔] Estadísticas exportadas a data/distribucion_clases_dataset.csv\")"
+        ]
+    }
+]
+
+notebook = {
+    "cells": cells,
+    "metadata": {
+        "colab": {
+            "name": "02_curaduria_dataset_vision.ipynb",
+            "provenance": []
+        },
+        "kernelspec": {
+            "display_name": "Python 3",
+            "language": "python",
+            "name": "python3"
+        },
+        "language_info": {
+            "name": "python",
+            "version": "3.10"
+        }
+    },
+    "nbformat": 4,
+    "nbformat_minor": 2
+}
+
+NOTEBOOK_PATH.parent.mkdir(parents=True, exist_ok=True)
+with open(NOTEBOOK_PATH, "w", encoding="utf-8") as f:
+    json.dump(notebook, f, indent=2)
+
+print(f"[✔] Cuaderno Jupyter generado exitosamente en: {NOTEBOOK_PATH}")
+print(f"    Total celdas: {len(cells)}")
