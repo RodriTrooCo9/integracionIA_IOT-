@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full bg-slate-950 text-slate-100">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ titulo }} | Tesis IoT-PID-IA Papa</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0fdf4',
+                            500: '#22c55e',
+                            600: '#16a34a',
+                            700: '#15803d',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Lucide Icons CDN -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(51, 65, 85, 0.6);
+        }
+    </style>
+</head>
+<body class="h-full flex flex-col font-sans antialiased">
+    <!-- Navbar Superior -->
+    <header class="border-b border-slate-800 bg-slate-900/90 backdrop-blur sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                    <i data-lucide="sprout" class="w-6 h-6 text-white"></i>
+                </div>
+                <div>
+                    <span class="font-bold text-lg text-white tracking-tight">AgriControl IoT–IA</span>
+                    <span class="hidden sm:inline-block text-xs px-2 py-0.5 ml-2 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Papa • La Paz 3600m</span>
+                </div>
+            </div>
+
+            <nav class="hidden md:flex items-center gap-1">
+                <a href="{% url 'dashboard:index' %}" class="px-3 py-2 rounded-lg text-sm font-medium transition-colors hover:bg-slate-800 hover:text-white {% if request.resolver_match.url_name == 'index' %}bg-slate-800 text-emerald-400{% else %}text-slate-400{% endif %}">
+                    <i data-lucide="layout-dashboard" class="w-4 h-4 inline mr-1"></i> En Vivo
+                </a>
+                <a href="{% url 'dashboard:control_pid' %}" class="px-3 py-2 rounded-lg text-sm font-medium transition-colors hover:bg-slate-800 hover:text-white {% if request.resolver_match.url_name == 'control_pid' %}bg-slate-800 text-emerald-400{% else %}text-slate-400{% endif %}">
+                    <i data-lucide="sliders" class="w-4 h-4 inline mr-1"></i> Control PID
+                </a>
+                <a href="{% url 'dashboard:vision' %}" class="px-3 py-2 rounded-lg text-sm font-medium transition-colors hover:bg-slate-800 hover:text-white {% if request.resolver_match.url_name == 'vision' %}bg-slate-800 text-emerald-400{% else %}text-slate-400{% endif %}">
+                    <i data-lucide="camera" class="w-4 h-4 inline mr-1"></i> Visión YOLO
+                </a>
+                <a href="{% url 'dashboard:gemelo_digital' %}" class="px-3 py-2 rounded-lg text-sm font-medium transition-colors hover:bg-slate-800 hover:text-white {% if request.resolver_match.url_name == 'gemelo_digital' %}bg-slate-800 text-emerald-400{% else %}text-slate-400{% endif %}">
+                    <i data-lucide="box" class="w-4 h-4 inline mr-1"></i> Gemelo Digital
+                </a>
+                <a href="{% url 'dashboard:experimentos' %}" class="px-3 py-2 rounded-lg text-sm font-medium transition-colors hover:bg-slate-800 hover:text-white {% if request.resolver_match.url_name == 'experimentos' %}bg-slate-800 text-emerald-400{% else %}text-slate-400{% endif %}">
+                    <i data-lucide="flask-conical" class="w-4 h-4 inline mr-1"></i> Ensayos E1-E8
+                </a>
+            </nav>
+
+            <div class="flex items-center gap-3">
+                <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800/80 border border-slate-700/60 text-xs">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span class="text-slate-300 font-mono" id="reloj-vivo">--:--:--</span>
+                </div>
+                <a href="/admin/" target="_blank" class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors" title="Django Admin Backoffice">
+                    <i data-lucide="shield" class="w-4 h-4"></i>
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Contenido Principal -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-slate-900 bg-slate-950 py-4 text-center text-xs text-slate-500">
+        <p>Prototipo de Tesis: Sistema Integrado IoT–PID–IA para la Regulación Microclimática y Detección de Plagas en Papa • La Paz, Bolivia</p>
+    </footer>
+
+    <script>
+        lucide.createIcons();
+        function actualizarReloj() {
+            const ahora = new Date();
+            document.getElementById('reloj-vivo').innerText = ahora.toLocaleTimeString();
+        }
+        setInterval(actualizarReloj, 1000);
+        actualizarReloj();
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,296 @@
+{% extends "dashboard/base.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
+                <i data-lucide="box" class="w-7 h-7 text-emerald-400"></i>
+                Gemelo Digital del Invernadero y Simulación de Perturbaciones
+            </h1>
+            <p class="text-slate-400 text-sm mt-1">
+                Representación física virtual acoplada al modelo FOPDT térmico y ecuaciones psicrométricas a 3600 msnm.
+            </p>
+        </div>
+        <div class="flex items-center gap-2">
+            <span id="badge-modo-activo" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                Modo: <span id="texto-modo-activo" class="font-mono">{{ estado.modo_perturbacion }}</span>
+            </span>
+        </div>
+    </div>
+
+    <!-- Inyector de Perturbaciones Altiplánicas -->
+    <div class="glass-panel p-6 rounded-2xl shadow-xl border border-slate-800">
+        <div class="flex items-center justify-between pb-4 border-b border-slate-800">
+            <div>
+                <h2 class="text-lg font-semibold text-white flex items-center gap-2">
+                    <i data-lucide="zap" class="w-5 h-5 text-amber-400"></i>
+                    Inyector de Perturbaciones y Estrés Agroclimático
+                </h2>
+                <p class="text-xs text-slate-400 mt-0.5">Seleccione un escenario para someter a prueba la respuesta dinámica del lazo PID y el árbol de decisión de riesgo.</p>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mt-4">
+            <button onclick="cambiarModo('NORMAL')" class="btn-modo p-3.5 rounded-xl border border-slate-800 bg-slate-900/80 hover:border-emerald-500 transition-all text-left flex flex-col justify-between" id="btn-NORMAL">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-bold text-white">Normal</span>
+                    <i data-lucide="sun" class="w-4 h-4 text-emerald-400"></i>
+                </div>
+                <p class="text-[10px] text-slate-400 mt-2">Día templado altiplánico (18°C / 75% HR).</p>
+            </button>
+
+            <button onclick="cambiarModo('HELADA')" class="btn-modo p-3.5 rounded-xl border border-slate-800 bg-slate-900/80 hover:border-cyan-500 transition-all text-left flex flex-col justify-between" id="btn-HELADA">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-bold text-white">Helada Nocturna</span>
+                    <i data-lucide="snowflake" class="w-4 h-4 text-cyan-400"></i>
+                </div>
+                <p class="text-[10px] text-slate-400 mt-2">Exterior a -3.0°C. Máxima potencia SSR.</p>
+            </button>
+
+            <button onclick="cambiarModo('TEMPORAL_NIEBLA')" class="btn-modo p-3.5 rounded-xl border border-slate-800 bg-slate-900/80 hover:border-indigo-500 transition-all text-left flex flex-col justify-between" id="btn-TEMPORAL_NIEBLA">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-bold text-white">Temporal Niebla</span>
+                    <i data-lucide="cloud-fog" class="w-4 h-4 text-indigo-400"></i>
+                </div>
+                <p class="text-[10px] text-slate-400 mt-2">Exterior 98% HR. Riesgo crítico Tizón.</p>
+            </button>
+
+            <button onclick="cambiarModo('OLA_CALOR')" class="btn-modo p-3.5 rounded-xl border border-slate-800 bg-slate-900/80 hover:border-rose-500 transition-all text-left flex flex-col justify-between" id="btn-OLA_CALOR">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-bold text-white">Ola de Calor</span>
+                    <i data-lucide="flame" class="w-4 h-4 text-rose-400"></i>
+                </div>
+                <p class="text-[10px] text-slate-400 mt-2">Interior 28°C. Extractor al 100%.</p>
+            </button>
+
+            <button onclick="cambiarModo('PLAGA_PULGON')" class="btn-modo p-3.5 rounded-xl border border-slate-800 bg-slate-900/80 hover:border-amber-500 transition-all text-left flex flex-col justify-between" id="btn-PLAGA_PULGON">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-bold text-white">Brote Pulgón</span>
+                    <i data-lucide="bug" class="w-4 h-4 text-amber-400"></i>
+                </div>
+                <p class="text-[10px] text-slate-400 mt-2">Trampa amarilla >15 ind. Alerta fitosanitaria.</p>
+            </button>
+        </div>
+    </div>
+
+    <!-- Esquema Gráfico 2D del Invernadero en Tiempo Real -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <!-- Render 2D del Invernadero -->
+        <div class="lg:col-span-8 glass-panel p-6 rounded-2xl shadow-xl flex flex-col justify-between relative overflow-hidden">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+                <h2 class="text-base font-semibold text-white flex items-center gap-2">
+                    <i data-lucide="layout" class="w-4 h-4 text-emerald-400"></i>
+                    Corte Esquemático Transversal del Invernadero (La Paz, 3600 msnm)
+                </h2>
+                <span class="text-xs font-mono text-slate-400" id="esquema-sp">SP: 18.0°C</span>
+            </div>
+
+            <!-- Contenedor del Esquema Gráfico 2D -->
+            <div class="my-6 relative bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 rounded-2xl border border-slate-800 p-6 min-h-[340px] flex flex-col justify-between">
+                <!-- Techo dos aguas e intemperie -->
+                <div class="flex items-center justify-between text-xs text-slate-400 border-b border-dashed border-slate-800 pb-2">
+                    <div class="flex items-center gap-1.5">
+                        <i data-lucide="cloud-sun" class="w-4 h-4 text-amber-400"></i>
+                        <span>Ambiente Exterior:</span>
+                        <span class="font-mono text-white" id="sch-temp-ext">-- °C</span> | 
+                        <span class="font-mono text-cyan-400" id="sch-hum-ext">-- %</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-[11px] text-slate-500">Cubierta de Polietileno UV (200 µm)</span>
+                    </div>
+                </div>
+
+                <!-- Zona Interior: Actuadores y Dosel de Cultivo -->
+                <div class="grid grid-cols-3 gap-4 my-6 items-center">
+                    <!-- Calefactor SSR -->
+                    <div class="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 flex flex-col items-center text-center shadow-lg transition-all" id="card-ssr">
+                        <div class="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mb-2" id="icon-ssr-bg">
+                            <i data-lucide="flame" class="w-6 h-6 text-amber-400" id="icon-ssr"></i>
+                        </div>
+                        <span class="text-xs font-bold text-white">Calefactor Eléctrico</span>
+                        <span class="text-[10px] text-slate-400 font-mono mt-0.5">SSR PWM 220V</span>
+                        <span class="text-sm font-bold text-amber-400 font-mono mt-2" id="sch-act-ssr">-- %</span>
+                    </div>
+
+                    <!-- Dosel de Papa + Sensor ESP32 Central -->
+                    <div class="p-4 rounded-xl bg-emerald-950/20 border border-emerald-500/30 flex flex-col items-center text-center shadow-lg relative">
+                        <div class="w-12 h-12 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center mb-2">
+                            <i data-lucide="sprout" class="w-7 h-7 text-emerald-400"></i>
+                        </div>
+                        <span class="text-xs font-bold text-white">Dosel Foliar de Papa</span>
+                        <span class="text-[10px] text-slate-400">Variedad Huaycha (Floración)</span>
+                        <div class="mt-2.5 pt-2 border-t border-emerald-500/20 w-full flex justify-around text-xs">
+                            <div>
+                                <span class="text-[9px] text-slate-400 block">$T_{int}$</span>
+                                <span class="font-bold font-mono text-emerald-400" id="sch-temp-int">--°C</span>
+                            </div>
+                            <div>
+                                <span class="text-[9px] text-slate-400 block">$HR_{int}$</span>
+                                <span class="font-bold font-mono text-cyan-400" id="sch-hum-int">--%</span>
+                            </div>
+                            <div>
+                                <span class="text-[9px] text-slate-400 block">VPD</span>
+                                <span class="font-bold font-mono text-indigo-400" id="sch-vpd">-- kPa</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Extractor de Ventilación -->
+                    <div class="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 flex flex-col items-center text-center shadow-lg transition-all" id="card-extractor">
+                        <div class="w-12 h-12 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center mb-2" id="icon-ext-bg">
+                            <i data-lucide="wind" class="w-6 h-6 text-cyan-400" id="icon-ext"></i>
+                        </div>
+                        <span class="text-xs font-bold text-white">Ventilador Extractor</span>
+                        <span class="text-[10px] text-slate-400 font-mono mt-0.5">Control de Humedad / VPD</span>
+                        <span class="text-sm font-bold text-cyan-400 font-mono mt-2" id="sch-act-extractor">-- %</span>
+                    </div>
+                </div>
+
+                <!-- Suelo e Inyección de Nebulización / Riego -->
+                <div class="flex items-center justify-between text-xs text-slate-400 border-t border-slate-800 pt-3">
+                    <div class="flex items-center gap-2">
+                        <i data-lucide="droplet" class="w-4 h-4 text-blue-400"></i>
+                        <span>Bomba Nebulizadora / Riego:</span>
+                        <span class="font-mono font-bold text-white" id="sch-act-bomba">-- %</span>
+                    </div>
+                    <div class="flex items-center gap-1.5">
+                        <i data-lucide="eye" class="w-4 h-4 text-teal-400"></i>
+                        <span>Cámara ESP32-CAM:</span>
+                        <span class="text-emerald-400 font-mono">Activa (1 foto/15 min)</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="text-[11px] text-slate-500 flex items-center justify-between">
+                <span>Tiempo de muestreo simulación: $T_s = 2.0\text{ s}$</span>
+                <span>Resolución térmica: $\pm 0.1\text{ °C}$</span>
+            </div>
+        </div>
+
+        <!-- Panel Lateral: Ecuaciones de Transferencia y Diagnóstico -->
+        <div class="lg:col-span-4 space-y-6">
+            <div class="glass-panel p-6 rounded-2xl shadow-xl">
+                <h3 class="text-base font-semibold text-white flex items-center gap-2 pb-3 border-b border-slate-800">
+                    <i data-lucide="binary" class="w-4 h-4 text-indigo-400"></i>
+                    Balance Térmico del Gemelo
+                </h3>
+                <div class="mt-4 space-y-3 text-xs text-slate-300">
+                    <p>
+                        El gemelo calcula la respuesta temporal discretizando la ecuación diferencial de primer orden:
+                    </p>
+                    <div class="p-3 rounded-xl bg-slate-900 border border-slate-800 font-mono text-[11px] text-indigo-300">
+                        \tau \frac{dT(t)}{dt} + T(t) = K \cdot u(t - \theta) + T_{ext}(t)
+                    </div>
+                    <ul class="list-disc list-inside space-y-1 text-slate-400 text-[11px]">
+                        <li>$K = 0.1639\text{ °C/\%}$ (Ganancia estática)</li>
+                        <li>$\tau = 242.96\text{ s}$ (Constante de inercia térmica)</li>
+                        <li>$\theta = 33.33\text{ s}$ (Tiempo muerto por retardo de transporte)</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="glass-panel p-6 rounded-2xl shadow-xl">
+                <h3 class="text-base font-semibold text-white flex items-center gap-2 pb-3 border-b border-slate-800">
+                    <i data-lucide="gauge" class="w-4 h-4 text-emerald-400"></i>
+                    Punto de Rocío y Psicrometría
+                </h3>
+                <div class="mt-4 space-y-3 text-xs">
+                    <div class="flex justify-between items-center py-1.5 border-b border-slate-800/60">
+                        <span class="text-slate-400">Punto de Rocío ($T_{dew}$)</span>
+                        <span class="font-mono font-bold text-cyan-300" id="lat-dew">-- °C</span>
+                    </div>
+                    <div class="flex justify-between items-center py-1.5 border-b border-slate-800/60">
+                        <span class="text-slate-400">Margen de Condensación</span>
+                        <span class="font-mono font-bold text-emerald-400" id="lat-margen">-- °C</span>
+                    </div>
+                    <div class="flex justify-between items-center py-1.5">
+                        <span class="text-slate-400">Presión Atmosférica</span>
+                        <span class="font-mono text-slate-300">67.5 kPa (La Paz 3600m)</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    async function cambiarModo(modo) {
+        try {
+            const resp = await fetch("{% url 'dashboard:api_modo_gemelo' %}", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ modo: modo })
+            });
+            const data = await resp.json();
+            if (data.status === "success") {
+                document.getElementById('texto-modo-activo').innerText = data.modo;
+                actualizarEstiloBotones(data.modo);
+                actualizarTelemetriaGemelo();
+            }
+        } catch (err) {
+            alert("Error al cambiar modo: " + err);
+        }
+    }
+
+    function actualizarEstiloBotones(modoActivo) {
+        document.querySelectorAll('.btn-modo').forEach(btn => {
+            btn.classList.remove('ring-2', 'ring-emerald-500', 'bg-slate-800');
+        });
+        const btnActivo = document.getElementById('btn-' + modoActivo);
+        if (btnActivo) {
+            btnActivo.classList.add('ring-2', 'ring-emerald-500', 'bg-slate-800');
+        }
+    }
+
+    async function actualizarTelemetriaGemelo() {
+        try {
+            const resp = await fetch("{% url 'dashboard:api_telemetria' %}");
+            const data = await resp.json();
+            const est = data.estado;
+
+            document.getElementById('sch-temp-ext').innerText = est.temp_exterior.toFixed(1) + " °C";
+            document.getElementById('sch-hum-ext').innerText = est.hum_exterior.toFixed(0) + " %";
+            document.getElementById('sch-temp-int').innerText = est.temp_interior.toFixed(1) + "°C";
+            document.getElementById('sch-hum-int').innerText = est.hum_interior.toFixed(0) + "%";
+            document.getElementById('sch-vpd').innerText = est.vpd_kpa.toFixed(2) + " kPa";
+            document.getElementById('sch-act-ssr').innerText = est.actuador_calefactor_ssr.toFixed(0) + " %";
+            document.getElementById('sch-act-extractor').innerText = est.actuador_extractor.toFixed(0) + " %";
+            document.getElementById('sch-act-bomba').innerText = est.actuador_bomba_humedad.toFixed(0) + " %";
+            document.getElementById('esquema-sp').innerText = "SP: " + est.sp_temperatura.toFixed(1) + "°C";
+
+            document.getElementById('lat-dew').innerText = est.punto_rocio.toFixed(1) + " °C";
+            const margen = est.temp_interior - est.punto_rocio;
+            document.getElementById('lat-margen').innerText = margen.toFixed(1) + " °C";
+
+            // Animaciones dinámicas de actuadores
+            const ssrVal = est.actuador_calefactor_ssr;
+            const iconSSR = document.getElementById('icon-ssr');
+            if (ssrVal > 20) {
+                iconSSR.classList.add('animate-pulse');
+            } else {
+                iconSSR.classList.remove('animate-pulse');
+            }
+
+            const extVal = est.actuador_extractor;
+            const iconExt = document.getElementById('icon-ext');
+            if (extVal > 20) {
+                iconExt.classList.add('animate-spin');
+            } else {
+                iconExt.classList.remove('animate-spin');
+            }
+
+        } catch (err) {
+            console.error("Error al actualizar telemetría del gemelo:", err);
+        }
+    }
+
+    setInterval(actualizarTelemetriaGemelo, 2000);
+    actualizarTelemetriaGemelo();
+    actualizarEstiloBotones("{{ estado.modo_perturbacion }}");
+</script>
+{% endblock %}

@@ -99,3 +99,7 @@ thesis/*.fdb_latexmk
 
 # Registro interno de fases (ignorado para git)
 fases/
+
+# Respaldos comprimidos del sistema
+backups/
+*.tar.gz

@@ -1,0 +1,31 @@
+# ==============================================================================
+# Systemd Service: Arranque Automático de Infraestructura IoT Invernadero Papa
+# Ubicación de instalación: /etc/systemd/system/iot-invernadero.service
+# Comandos de activación:
+#   sudo cp config/systemd/iot-invernadero.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable iot-invernadero.service
+#   sudo systemctl start iot-invernadero.service
+# ==============================================================================
+
+[Unit]
+Description=Servicios Docker Compose IoT-PID-IA Invernadero Papa (La Paz)
+Documentation=https://github.com/tu-usuario/IOTtesis
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/home/rodrigo/Desktop/IOTtesis
+ExecStart=/usr/bin/docker compose up -d
+ExecStop=/usr/bin/docker compose down
+TimeoutStartSec=0
+
+# Reinicio automático en caso de caída del daemon Docker
+Restart=on-failure
+RestartSec=10s
+
+[Install]
+WantedBy=multi-user.target

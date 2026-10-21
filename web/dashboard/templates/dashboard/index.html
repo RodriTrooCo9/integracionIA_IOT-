@@ -1,0 +1,267 @@
+{% extends 'dashboard/base.html' %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Fila 1: KPIs Principales y Semáforo Fitosanitario -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <!-- Tarjeta 1: Temperatura -->
+        <div class="glass-panel p-5 rounded-2xl relative overflow-hidden">
+            <div class="flex items-center justify-between text-slate-400 mb-2">
+                <span class="text-xs font-semibold uppercase tracking-wider">Temp. Interior</span>
+                <i data-lucide="thermometer" class="w-5 h-5 text-rose-400"></i>
+            </div>
+            <div class="flex items-baseline gap-2">
+                <span class="text-3xl font-extrabold text-white" id="val-temp-in">{{ estado.temp_interior }}</span>
+                <span class="text-slate-400 text-sm">°C</span>
+            </div>
+            <div class="mt-3 flex items-center justify-between text-xs text-slate-400 border-t border-slate-800/80 pt-2">
+                <span>Exterior: <strong class="text-slate-300" id="val-temp-ext">{{ estado.temp_exterior }}°C</strong></span>
+                <span>SP: <strong class="text-rose-400" id="val-sp-temp">{{ estado.sp_temperatura }}°C</strong></span>
+            </div>
+        </div>
+
+        <!-- Tarjeta 2: Humedad Relativa -->
+        <div class="glass-panel p-5 rounded-2xl relative overflow-hidden">
+            <div class="flex items-center justify-between text-slate-400 mb-2">
+                <span class="text-xs font-semibold uppercase tracking-wider">Humedad Interior</span>
+                <i data-lucide="droplets" class="w-5 h-5 text-sky-400"></i>
+            </div>
+            <div class="flex items-baseline gap-2">
+                <span class="text-3xl font-extrabold text-white" id="val-hum-in">{{ estado.hum_interior }}</span>
+                <span class="text-slate-400 text-sm">%</span>
+            </div>
+            <div class="mt-3 flex items-center justify-between text-xs text-slate-400 border-t border-slate-800/80 pt-2">
+                <span>Pto. Rocío: <strong class="text-sky-300" id="val-rocio">{{ estado.punto_rocio }}°C</strong></span>
+                <span>SP: <strong class="text-sky-400" id="val-sp-hum">{{ estado.sp_humedad }}%</strong></span>
+            </div>
+        </div>
+
+        <!-- Tarjeta 3: VPD -->
+        <div class="glass-panel p-5 rounded-2xl relative overflow-hidden">
+            <div class="flex items-center justify-between text-slate-400 mb-2">
+                <span class="text-xs font-semibold uppercase tracking-wider">Déficit Presión (VPD)</span>
+                <i data-lucide="wind" class="w-5 h-5 text-emerald-400"></i>
+            </div>
+            <div class="flex items-baseline gap-2">
+                <span class="text-3xl font-extrabold text-white" id="val-vpd">{{ estado.vpd_kpa }}</span>
+                <span class="text-slate-400 text-sm">kPa</span>
+            </div>
+            <div class="mt-3 flex items-center justify-between text-xs text-slate-400 border-t border-slate-800/80 pt-2">
+                <span>Banda Óptima: <strong class="text-emerald-400">0.5 - 1.2 kPa</strong></span>
+            </div>
+        </div>
+
+        <!-- Tarjeta 4: Semáforo Fitosanitario -->
+        <div class="glass-panel p-5 rounded-2xl relative overflow-hidden border-l-4 {% if estado.nivel_riesgo == 'BAJO' %}border-l-emerald-500{% elif estado.nivel_riesgo == 'MEDIO' %}border-l-amber-500{% elif estado.nivel_riesgo == 'ALTO' %}border-l-orange-500{% else %}border-l-rose-500{% endif %}" id="card-semaforo">
+            <div class="flex items-center justify-between text-slate-400 mb-2">
+                <span class="text-xs font-semibold uppercase tracking-wider">Riesgo Fitosanitario</span>
+                <i data-lucide="shield-alert" class="w-5 h-5 text-amber-400"></i>
+            </div>
+            <div class="flex items-center justify-between">
+                <div class="flex items-baseline gap-2">
+                    <span class="text-3xl font-black" id="val-nivel-riesgo">{{ estado.nivel_riesgo }}</span>
+                    <span class="text-xs text-slate-400">(Score: <span id="val-score-riesgo">{{ estado.score_riesgo }}</span>)</span>
+                </div>
+                <span class="w-4 h-4 rounded-full {% if estado.nivel_riesgo == 'BAJO' %}bg-emerald-500 shadow-lg shadow-emerald-500/50{% elif estado.nivel_riesgo == 'MEDIO' %}bg-amber-500 shadow-lg shadow-amber-500/50{% elif estado.nivel_riesgo == 'ALTO' %}bg-orange-500 shadow-lg shadow-orange-500/50{% else %}bg-rose-500 shadow-lg shadow-rose-500/50 animate-ping{% endif %}" id="indicador-luz"></span>
+            </div>
+            <div class="mt-3 text-xs text-slate-300 border-t border-slate-800/80 pt-2 truncate" id="val-recomendacion" title="{{ explicacion.recomendacion_accion }}">
+                {{ explicacion.recomendacion_accion }}
+            </div>
+        </div>
+    </div>
+
+    <!-- Fila 2: Gráficos de Telemetría en Tiempo Real -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Gráfico 1: Control Térmico -->
+        <div class="glass-panel p-5 rounded-2xl">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                    <i data-lucide="activity" class="w-4 h-4 text-rose-400"></i> Regulación Térmica en Vivo
+                </h3>
+                <span class="text-xs text-slate-400">Muestreo: 3s</span>
+            </div>
+            <div class="h-64">
+                <canvas id="chart-termico"></canvas>
+            </div>
+        </div>
+
+        <!-- Gráfico 2: Control Higrométrico y Punto de Rocío -->
+        <div class="glass-panel p-5 rounded-2xl">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                    <i data-lucide="waves" class="w-4 h-4 text-sky-400"></i> Humedad y Punto de Rocío
+                </h3>
+                <span class="text-xs text-slate-400">Muestreo: 3s</span>
+            </div>
+            <div class="h-64">
+                <canvas id="chart-humedad"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Fila 3: Estado de Actuadores y Explicabilidad Agronómica SHAP -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Panel de Actuadores -->
+        <div class="glass-panel p-5 rounded-2xl">
+            <h3 class="text-sm font-bold text-white flex items-center gap-2 mb-4">
+                <i data-lucide="cpu" class="w-4 h-4 text-emerald-400"></i> Actuadores PID Split-Range
+            </h3>
+            <div class="space-y-4 text-sm">
+                <div>
+                    <div class="flex justify-between mb-1">
+                        <span class="text-slate-300">Calefactor SSR (220V)</span>
+                        <span class="font-bold text-rose-400" id="val-act-calefactor">{{ estado.calefactor_pct }}%</span>
+                    </div>
+                    <div class="w-full bg-slate-800 rounded-full h-2.5 overflow-hidden">
+                        <div class="bg-rose-500 h-2.5 rounded-full transition-all duration-500" id="bar-calefactor" style="width: {{ estado.calefactor_pct }}%"></div>
+                    </div>
+                </div>
+                <div>
+                    <div class="flex justify-between mb-1">
+                        <span class="text-slate-300">Extractor PWM (12V)</span>
+                        <span class="font-bold text-sky-400" id="val-act-extractor">{{ estado.extractor_pct }}%</span>
+                    </div>
+                    <div class="w-full bg-slate-800 rounded-full h-2.5 overflow-hidden">
+                        <div class="bg-sky-500 h-2.5 rounded-full transition-all duration-500" id="bar-extractor" style="width: {{ estado.extractor_pct }}%"></div>
+                    </div>
+                </div>
+                <div class="pt-3 border-t border-slate-800/80 flex items-center justify-between">
+                    <span class="text-slate-300">Modo de Operación:</span>
+                    <span class="px-2.5 py-1 rounded-md text-xs font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">AUTÓNOMO (PID Borde)</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Explicabilidad Agronómica SHAP -->
+        <div class="glass-panel p-5 rounded-2xl lg:col-span-2">
+            <h3 class="text-sm font-bold text-white flex items-center gap-2 mb-3">
+                <i data-lucide="brain-circuit" class="w-4 h-4 text-amber-400"></i> Explicabilidad Agronómica del Riesgo (Factores SHAP)
+            </h3>
+            <p class="text-xs text-slate-400 mb-3">
+                Desglose causal del modelo de Fusión Multimodal ($45\%$ Clima + $35\%$ Visión + $20\%$ Inercia temporal):
+            </p>
+            <div class="space-y-2.5" id="lista-factores-shap">
+                {% for f in explicacion.factores_shap %}
+                <div class="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800 flex items-start justify-between gap-3">
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="font-medium text-xs text-white">{{ f.variable }}</span>
+                            <span class="text-[10px] px-1.5 py-0.5 rounded {% if 'AUMENTA' in f.direccion %}bg-rose-500/20 text-rose-300 border border-rose-500/30{% else %}bg-emerald-500/20 text-emerald-300 border border-emerald-500/30{% endif %}">{{ f.direccion }}</span>
+                        </div>
+                        <p class="text-xs text-slate-400 mt-1">{{ f.explicacion }}</p>
+                    </div>
+                    <span class="font-mono text-xs font-bold text-amber-300">{{ f.impacto }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Inicialización de Gráficos Chart.js
+    const maxPuntos = 20;
+    const labels = [];
+    const dataTempIn = [], dataTempExt = [], dataSpTemp = [];
+    const dataHumIn = [], dataRocio = [], dataSpHum = [];
+
+    const ctxTermico = document.getElementById('chart-termico').getContext('2d');
+    const chartTermico = new Chart(ctxTermico, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [
+                { label: 'Temp Interior (°C)', data: dataTempIn, borderColor: '#f43f5e', backgroundColor: 'rgba(244,63,94,0.1)', tension: 0.3, fill: true, borderWidth: 2 },
+                { label: 'Temp Exterior (°C)', data: dataTempExt, borderColor: '#64748b', borderDash: [5, 5], tension: 0.3, borderWidth: 1.5 },
+                { label: 'Setpoint (°C)', data: dataSpTemp, borderColor: '#fb7185', borderDash: [2, 2], pointRadius: 0, borderWidth: 2 }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: { grid: { color: 'rgba(51, 65, 85, 0.3)' }, ticks: { color: '#94a3b8', font: { size: 10 } } },
+                y: { grid: { color: 'rgba(51, 65, 85, 0.3)' }, ticks: { color: '#94a3b8', font: { size: 10 } } }
+            },
+            plugins: { legend: { labels: { color: '#e2e8f0', boxWidth: 12, font: { size: 11 } } } }
+        }
+    });
+
+    const ctxHumedad = document.getElementById('chart-humedad').getContext('2d');
+    const chartHumedad = new Chart(ctxHumedad, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [
+                { label: 'Humedad (%)', data: dataHumIn, borderColor: '#38bdf8', backgroundColor: 'rgba(56,189,248,0.1)', tension: 0.3, fill: true, borderWidth: 2 },
+                { label: 'Pto. Rocío (°C)', data: dataRocio, borderColor: '#818cf8', borderDash: [4, 4], tension: 0.3, borderWidth: 1.5 },
+                { label: 'Setpoint (%)', data: dataSpHum, borderColor: '#0284c7', borderDash: [2, 2], pointRadius: 0, borderWidth: 2 }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: { grid: { color: 'rgba(51, 65, 85, 0.3)' }, ticks: { color: '#94a3b8', font: { size: 10 } } },
+                y: { grid: { color: 'rgba(51, 65, 85, 0.3)' }, ticks: { color: '#94a3b8', font: { size: 10 } } }
+            },
+            plugins: { legend: { labels: { color: '#e2e8f0', boxWidth: 12, font: { size: 11 } } } }
+        }
+    });
+
+    // Sondeo asíncrono en vivo (polling cada 3 segundos)
+    async function actualizarTelemetria() {
+        try {
+            const resp = await fetch("{% url 'dashboard:api_telemetria' %}");
+            const data = await resp.json();
+            const est = data.estado;
+            const exp = data.explicacion;
+
+            // Actualizar textos
+            document.getElementById('val-temp-in').innerText = est.temp_interior;
+            document.getElementById('val-temp-ext').innerText = est.temp_exterior + '°C';
+            document.getElementById('val-sp-temp').innerText = est.sp_temperatura + '°C';
+
+            document.getElementById('val-hum-in').innerText = est.hum_interior;
+            document.getElementById('val-rocio').innerText = est.punto_rocio + '°C';
+            document.getElementById('val-sp-hum').innerText = est.sp_humedad + '%';
+
+            document.getElementById('val-vpd').innerText = est.vpd_kpa;
+            document.getElementById('val-nivel-riesgo').innerText = est.nivel_riesgo;
+            document.getElementById('val-score-riesgo').innerText = est.score_riesgo;
+            document.getElementById('val-recomendacion').innerText = exp.recomendacion_accion;
+
+            document.getElementById('val-act-calefactor').innerText = est.calefactor_pct + '%';
+            document.getElementById('bar-calefactor').style.width = est.calefactor_pct + '%';
+            document.getElementById('val-act-extractor').innerText = est.extractor_pct + '%';
+            document.getElementById('bar-extractor').style.width = est.extractor_pct + '%';
+
+            // Actualizar Gráficos
+            if (labels.length >= maxPuntos) {
+                labels.shift();
+                dataTempIn.shift(); dataTempExt.shift(); dataSpTemp.shift();
+                dataHumIn.shift(); dataRocio.shift(); dataSpHum.shift();
+            }
+            labels.push(data.timestamp);
+            dataTempIn.push(est.temp_interior);
+            dataTempExt.push(est.temp_exterior);
+            dataSpTemp.push(est.sp_temperatura);
+
+            dataHumIn.push(est.hum_interior);
+            dataRocio.push(est.punto_rocio);
+            dataSpHum.push(est.sp_humedad);
+
+            chartTermico.update();
+            chartHumedad.update();
+
+        } catch (e) {
+            console.warn("Sondeo telemetría en espera...", e);
+        }
+    }
+
+    setInterval(actualizarTelemetria, 3000);
+    actualizarTelemetria();
+</script>
+{% endblock %}

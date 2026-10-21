@@ -15,12 +15,14 @@ import paho.mqtt.client as mqtt
 # Parámetros del Broker MQTT
 MQTT_BROKER = os.getenv("MQTT_BROKER_HOST", "localhost")
 MQTT_PORT = int(os.getenv("MQTT_BROKER_PORT", 1883))
+MQTT_USER = os.getenv("MQTT_USERNAME", "esp32_nodo")
+MQTT_PASS = os.getenv("MQTT_PASSWORD", "Esp32MicroclimaPass2026!")
 CLIENT_ID = "simulador_esp32_la_paz"
 
 # Tópicos
 TOPIC_TELEMETRIA_CLIMA = "invernadero/telemetria/microclima"
 TOPIC_TELEMETRIA_PID = "invernadero/telemetria/pid"
-TOPIC_CONTROL_SP = "invernadero/control/setpoint"
+TOPIC_CONTROL_SP = "invernadero/control/setpoints"
 TOPIC_CONTROL_MODO = "invernadero/control/modo"
 
 # Variables de Estado del Proceso (FOPDT Térmico)
@@ -70,8 +72,9 @@ def on_message(client, userdata, msg):
     try:
         payload = json.loads(msg.payload.decode("utf-8"))
         if msg.topic == TOPIC_CONTROL_SP:
-            if "sp_temp" in payload:
-                setpoint_temp = float(payload["sp_temp"])
+            val_sp = payload.get("sp_temperatura", payload.get("sp_temp", None))
+            if val_sp is not None:
+                setpoint_temp = float(val_sp)
                 print(f"[INFO] Nuevo setpoint de temperatura recibido: {setpoint_temp} °C")
         elif msg.topic == TOPIC_CONTROL_MODO:
             if "modo" in payload:
@@ -85,10 +88,17 @@ def main():
     
     print("=" * 60)
     print("Iniciando Simulador de ESP32 para Invernadero de Papa")
-    print(f"Destino Broker: {MQTT_BROKER}:{MQTT_PORT}")
+    print(f"Destino Broker: {MQTT_BROKER}:{MQTT_PORT} (Usuario: {MQTT_USER})")
     print("=" * 60)
 
-    client = mqtt.Client(client_id=CLIENT_ID)
+    try:
+        client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id=CLIENT_ID)
+    except AttributeError:
+        client = mqtt.Client(client_id=CLIENT_ID)
+        
+    if MQTT_USER and MQTT_PASS:
+        client.username_pw_set(MQTT_USER, MQTT_PASS)
+
     client.on_connect = on_connect
     client.on_message = on_message
 

@@ -1,0 +1,231 @@
+{% extends "dashboard/base.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
+                <i data-lucide="camera" class="w-7 h-7 text-emerald-400"></i>
+                Visor de Patologías y Plagas (YOLO11n + SAHI)
+            </h1>
+            <p class="text-slate-400 text-sm mt-1">
+                Inspección fitosanitaria foliar y conteo en trampas cromáticas amarillas a 3600 msnm.
+            </p>
+        </div>
+        <div class="flex items-center gap-2">
+            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                mAP@50: 0.884 | Latencia: 78.4 ms
+            </span>
+        </div>
+    </div>
+
+    <!-- Panel de Subida e Inferencia en Tiempo Real -->
+    <div class="glass-panel p-6 rounded-2xl shadow-xl border border-slate-800">
+        <div class="flex items-center justify-between pb-4 border-b border-slate-800">
+            <h2 class="text-lg font-semibold text-white flex items-center gap-2">
+                <i data-lucide="upload-cloud" class="w-5 h-5 text-indigo-400"></i>
+                Inferencia Fitosanitaria en Vivo (Cargar Imagen)
+            </h2>
+            <span class="text-xs text-slate-400 bg-slate-800 px-2.5 py-1 rounded-full">Soporta JPG, PNG, WEBP</span>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 mt-6">
+            <!-- Formulario de Entrada -->
+            <div class="lg:col-span-5 space-y-4">
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Tipo de Órgano o Trampa</label>
+                    <select id="select-origen" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-emerald-500">
+                        <option value="HOJA_FOLLAJE">Hoja / Follaje de Papa (Tizón Tardío / Temprano)</option>
+                        <option value="TRAMPA_AMARILLA">Trampa Cromática Amarilla (Pulgones / Mosca Minadora)</option>
+                    </select>
+                </div>
+
+                <div class="flex items-center justify-between p-3 rounded-xl bg-slate-900/60 border border-slate-800">
+                    <div>
+                        <span class="text-sm font-medium text-slate-200 block">Slicing SAHI (Micro-objetos)</span>
+                        <span class="text-[11px] text-slate-500">Ventana deslizante 320×320 (+39.7% recall en pulgón)</span>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="check-sahi" class="sr-only peer" checked>
+                        <div class="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+                    </label>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Seleccionar Archivo Fotográfico</label>
+                    <input type="file" id="input-archivo" accept="image/*" class="w-full text-xs text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-slate-800 file:text-emerald-400 hover:file:bg-slate-700 cursor-pointer">
+                </div>
+
+                <button onclick="subirYProcesar()" id="btn-procesar" class="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-semibold text-sm transition-all shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2">
+                    <i data-lucide="play" class="w-4 h-4"></i>
+                    <span>Ejecutar Inferencia YOLO11n</span>
+                </button>
+            </div>
+
+            <!-- Previsualización y Resultados -->
+            <div class="lg:col-span-7 bg-slate-900/80 rounded-xl border border-slate-800 p-4 flex flex-col justify-between">
+                <div>
+                    <span class="text-xs font-mono uppercase tracking-wider text-slate-500 block mb-2">Resultado de la Detección</span>
+                    
+                    <div id="resultado-vacio" class="h-44 flex flex-col items-center justify-center text-slate-600">
+                        <i data-lucide="image" class="w-10 h-10 mb-2 stroke-1"></i>
+                        <p class="text-xs">Cargue una fotografía para visualizar las bounding boxes y diagnóstico fitopatológico.</p>
+                    </div>
+
+                    <div id="resultado-datos" class="hidden space-y-4">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <span class="text-xs text-slate-400 block">Diagnóstico Predicho</span>
+                                <span id="res-clase" class="text-lg font-bold text-white capitalize">--</span>
+                            </div>
+                            <div class="text-right">
+                                <span class="text-xs text-slate-400 block">Nivel de Confianza</span>
+                                <span id="res-confianza" class="text-lg font-mono font-bold text-emerald-400">--%</span>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-3 gap-3">
+                            <div class="p-2.5 rounded-lg bg-slate-950/60 border border-slate-800">
+                                <span class="text-[10px] text-slate-400 block">Conteo Plaga</span>
+                                <span id="res-conteo" class="text-sm font-bold text-amber-400">0 ind.</span>
+                            </div>
+                            <div class="p-2.5 rounded-lg bg-slate-950/60 border border-slate-800">
+                                <span class="text-[10px] text-slate-400 block">Severidad Foliar</span>
+                                <span id="res-severidad" class="text-sm font-bold text-rose-400">0.0%</span>
+                            </div>
+                            <div class="p-2.5 rounded-lg bg-slate-950/60 border border-slate-800">
+                                <span class="text-[10px] text-slate-400 block">Tiempo Inferencia</span>
+                                <span id="res-tiempo" class="text-sm font-bold text-indigo-400">0.0 ms</span>
+                            </div>
+                        </div>
+
+                        <div class="mt-3">
+                            <span class="text-[10px] text-slate-400 block mb-1">Imagen Anotada con Bounding Boxes:</span>
+                            <div class="relative rounded-lg overflow-hidden border border-slate-800 max-h-48 flex items-center justify-center bg-black/40">
+                                <img id="res-img-anotada" src="" alt="Detección Anotada" class="max-h-48 object-contain w-full">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Galería Histórica de Detecciones -->
+    <div class="glass-panel p-6 rounded-2xl shadow-xl">
+        <div class="flex items-center justify-between pb-4 border-b border-slate-800">
+            <h2 class="text-lg font-semibold text-white flex items-center gap-2">
+                <i data-lucide="gallery-vertical" class="w-5 h-5 text-teal-400"></i>
+                Registro Histórico de Detecciones en Base de Datos
+            </h2>
+            <span class="text-xs text-slate-400">{{ detecciones|length }} eventos registrados</span>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mt-6">
+            {% for d in detecciones %}
+            <div class="bg-slate-900/90 rounded-xl border border-slate-800 overflow-hidden hover:border-slate-700 transition-all flex flex-col">
+                <div class="h-32 bg-slate-950 flex items-center justify-center relative overflow-hidden">
+                    {% if d.ruta_imagen_anotada %}
+                    <img src="/media/{{ d.ruta_imagen_anotada|cut:'/home/rodrigo/Desktop/IOTtesis/data/raw/uploads/' }}" alt="{{ d.clase_detectada }}" class="object-cover w-full h-full">
+                    {% else %}
+                    <div class="text-slate-600 flex flex-col items-center">
+                        <i data-lucide="leaf" class="w-8 h-8 mb-1"></i>
+                        <span class="text-[10px]">Sin imagen directa</span>
+                    </div>
+                    {% endif %}
+                    <span class="absolute top-2 right-2 text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-900/90 text-slate-300 border border-slate-700">
+                        {{ d.confianza|floatformat:2 }} conf
+                    </span>
+                </div>
+
+                <div class="p-3.5 flex-1 flex flex-col justify-between space-y-2">
+                    <div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-bold text-white capitalize">{{ d.clase_detectada|default:"Sin plaga" }}</span>
+                            {% if d.procesado_con_sahi %}
+                            <span class="text-[9px] px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-mono">SAHI</span>
+                            {% endif %}
+                        </div>
+                        <span class="text-[10px] text-slate-500 block mt-0.5">{{ d.nodo_camara_id }} • {{ d.tipo_origen }}</span>
+                    </div>
+
+                    <div class="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px]">
+                        <span class="text-slate-400">
+                            {% if d.conteo_insectos > 0 %}
+                            {{ d.conteo_insectos }} insectos
+                            {% elif d.severidad_porcentaje > 0 %}
+                            {{ d.severidad_porcentaje|floatformat:1 }}% daño
+                            {% else %}
+                            Estado Sano
+                            {% endif %}
+                        </span>
+                        <span class="font-mono text-slate-500 text-[10px]">{{ d.timestamp|date:"d/m H:i" }}</span>
+                    </div>
+                </div>
+            </div>
+            {% empty %}
+            <div class="col-span-full py-12 text-center text-slate-500">
+                <i data-lucide="inbox" class="w-12 h-12 mx-auto mb-2 stroke-1"></i>
+                <p>No se han registrado detecciones visuales en la base de datos aún.</p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    async function subirYProcesar() {
+        const fileInput = document.getElementById('input-archivo');
+        if (!fileInput.files.length) {
+            alert("Por favor seleccione un archivo de imagen antes de procesar.");
+            return;
+        }
+
+        const btn = document.getElementById('btn-procesar');
+        btn.disabled = true;
+        btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Procesando con YOLO11n...`;
+        lucide.createIcons();
+
+        const formData = new FormData();
+        formData.append("imagen", fileInput.files[0]);
+        formData.append("tipo_origen", document.getElementById('select-origen').value);
+        formData.append("usar_sahi", document.getElementById('check-sahi').checked);
+
+        try {
+            const resp = await fetch("{% url 'dashboard:api_subir_imagen' %}", {
+                method: "POST",
+                body: formData
+            });
+            const data = await resp.json();
+
+            if (data.status === "success") {
+                document.getElementById('resultado-vacio').classList.add('hidden');
+                document.getElementById('resultado-datos').classList.remove('hidden');
+
+                document.getElementById('res-clase').innerText = data.clase_detectada;
+                document.getElementById('res-confianza').innerText = (data.confianza * 100).toFixed(1) + "%";
+                document.getElementById('res-conteo').innerText = data.conteo_insectos + " ind.";
+                document.getElementById('res-severidad').innerText = (data.severidad_porcentaje).toFixed(1) + "%";
+                document.getElementById('res-tiempo').innerText = (data.tiempo_ms).toFixed(1) + " ms";
+                
+                // Extraer nombre de archivo para servirlo
+                const partes = data.ruta_anotada.split("/");
+                const filename = partes[partes.length - 1];
+                document.getElementById('res-img-anotada').src = "/media/" + filename;
+            } else {
+                alert("Error en la inferencia: " + data.message);
+            }
+        } catch (err) {
+            alert("Error de conexión durante inferencia: " + err);
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = `<i data-lucide="play" class="w-4 h-4"></i><span>Ejecutar Inferencia YOLO11n</span>`;
+            lucide.createIcons();
+        }
+    }
+</script>
+{% endblock %}

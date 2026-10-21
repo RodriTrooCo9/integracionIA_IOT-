@@ -1,0 +1,319 @@
+{% extends "dashboard/base.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Encabezado de la página -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
+                <i data-lucide="sliders" class="w-7 h-7 text-emerald-400"></i>
+                Control PID, Setpoints y Sintonización Automática
+            </h1>
+            <p class="text-slate-400 text-sm mt-1">
+                Ajuste de parámetros dinámicos para lazos térmicos y psicrométricos con trazabilidad en base de datos.
+            </p>
+        </div>
+        <div class="flex items-center gap-2">
+            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                ESP32 Online: FOPDT Activo
+            </span>
+        </div>
+    </div>
+
+    <!-- Fila 1: Setpoints Agronómicos + Ganancias PID -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Tarjeta Setpoints Agronómicos -->
+        <div class="glass-panel p-6 rounded-2xl shadow-xl flex flex-col justify-between">
+            <div>
+                <div class="flex items-center justify-between pb-4 border-b border-slate-800">
+                    <h2 class="text-lg font-semibold text-white flex items-center gap-2">
+                        <i data-lucide="target" class="w-5 h-5 text-emerald-400"></i>
+                        Setpoints Agronómicos (Papa Huaycha / Desirée)
+                    </h2>
+                    <span class="text-xs text-slate-400 bg-slate-800 px-2 py-1 rounded">Rango 3600 msnm</span>
+                </div>
+
+                <div class="mt-6 space-y-5">
+                    <div>
+                        <div class="flex justify-between items-center mb-1">
+                            <label class="text-sm font-medium text-slate-300">Setpoint Temperatura ($SP_{temp}$)</label>
+                            <span class="text-sm font-bold text-emerald-400" id="val-sp-temp">{{ estado.sp_temperatura|floatformat:1 }} °C</span>
+                        </div>
+                        <input type="range" id="input-sp-temp" min="8.0" max="28.0" step="0.5" value="{{ estado.sp_temperatura|floatformat:1 }}"
+                            class="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                            oninput="document.getElementById('val-sp-temp').innerText = this.value + ' °C'">
+                        <div class="flex justify-between text-xs text-slate-500 mt-1">
+                            <span>8.0°C (Mín)</span>
+                            <span class="text-emerald-400">18.0°C (Óptimo Papa)</span>
+                            <span>28.0°C (Máx)</span>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="flex justify-between items-center mb-1">
+                            <label class="text-sm font-medium text-slate-300">Setpoint Humedad Relativa ($SP_{hum}$)</label>
+                            <span class="text-sm font-bold text-cyan-400" id="val-sp-hum">{{ estado.sp_humedad|floatformat:0 }} %</span>
+                        </div>
+                        <input type="range" id="input-sp-hum" min="40" max="95" step="1" value="{{ estado.sp_humedad|floatformat:0 }}"
+                            class="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-cyan-500"
+                            oninput="document.getElementById('val-sp-hum').innerText = this.value + ' %'">
+                        <div class="flex justify-between text-xs text-slate-500 mt-1">
+                            <span>40% (Seco)</span>
+                            <span class="text-cyan-400">75% (Óptimo Tuberización)</span>
+                            <span>95% (Riesgo Tizón)</span>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="text-xs text-slate-400 block mb-1">Motivo o Justificación del Cambio (Auditoría)</label>
+                        <input type="text" id="input-justificacion-sp" placeholder="Ej: Ajuste nocturno por previsión de helada"
+                            class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-emerald-500">
+                    </div>
+                </div>
+            </div>
+
+            <div class="pt-6 mt-6 border-t border-slate-800 flex items-center justify-between">
+                <span class="text-xs text-slate-500">Publica vía MQTT con QoS 1 (Retain)</span>
+                <button onclick="enviarSetpoints()" class="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-sm transition-all shadow-lg shadow-emerald-600/30 flex items-center gap-2">
+                    <i data-lucide="save" class="w-4 h-4"></i> Guardar Setpoints
+                </button>
+            </div>
+        </div>
+
+        <!-- Tarjeta Ganancias PID -->
+        <div class="glass-panel p-6 rounded-2xl shadow-xl flex flex-col justify-between">
+            <div>
+                <div class="flex items-center justify-between pb-4 border-b border-slate-800">
+                    <h2 class="text-lg font-semibold text-white flex items-center gap-2">
+                        <i data-lucide="activity" class="w-5 h-5 text-amber-400"></i>
+                        Ganancias del Controlador PID Térmico
+                    </h2>
+                    <span class="text-xs text-amber-400/90 bg-amber-500/10 border border-amber-500/20 px-2 py-1 rounded">Anti-Windup Activo</span>
+                </div>
+
+                <div class="mt-6 space-y-4">
+                    <div class="grid grid-cols-3 gap-4">
+                        <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-800">
+                            <label class="text-xs text-slate-400 block font-mono">$K_p$ Proporcional</label>
+                            <input type="number" step="0.001" id="input-kp" value="{{ estado.kp }}"
+                                class="w-full bg-transparent border-b border-amber-500/40 text-lg font-bold text-amber-300 focus:outline-none focus:border-amber-400 mt-1">
+                            <span class="text-[10px] text-slate-500 block mt-1">Acción de choque</span>
+                        </div>
+                        <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-800">
+                            <label class="text-xs text-slate-400 block font-mono">$K_i$ Integral</label>
+                            <input type="number" step="0.0001" id="input-ki" value="{{ estado.ki }}"
+                                class="w-full bg-transparent border-b border-amber-500/40 text-lg font-bold text-amber-300 focus:outline-none focus:border-amber-400 mt-1">
+                            <span class="text-[10px] text-slate-500 block mt-1">Elimina offset $e_{ss}$</span>
+                        </div>
+                        <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-800">
+                            <label class="text-xs text-slate-400 block font-mono">$K_d$ Derivativo</label>
+                            <input type="number" step="0.001" id="input-kd" value="{{ estado.kd }}"
+                                class="w-full bg-transparent border-b border-amber-500/40 text-lg font-bold text-amber-300 focus:outline-none focus:border-amber-400 mt-1">
+                            <span class="text-[10px] text-slate-500 block mt-1">Amortigua oscilación</span>
+                        </div>
+                    </div>
+
+                    <div class="p-3 rounded-xl bg-slate-900/60 border border-slate-800 text-xs text-slate-400 space-y-1">
+                        <p class="font-medium text-slate-300">Ecuación implementada en ESP32:</p>
+                        <p class="font-mono text-emerald-400 text-[11px]">u(t) = K_p · e(t) + K_i · ∫ e(τ)dτ + K_d · (de/dt)</p>
+                        <p class="text-[10px] text-slate-500">Limitación de salida $u(t) \in [0, 100\%]$ modulada vía SSR con Zero-Crossing a 10 Hz.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pt-6 mt-6 border-t border-slate-800 flex items-center justify-between">
+                <span class="text-xs text-slate-500">Actualiza firmware en tiempo real</span>
+                <button onclick="enviarPID()" class="px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-medium text-sm transition-all shadow-lg shadow-amber-600/30 flex items-center gap-2">
+                    <i data-lucide="refresh-cw" class="w-4 h-4"></i> Actualizar Ganancias
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Fila 2: Autotuning Cohen-Coon / Optuna FOPDT -->
+    <div class="glass-panel p-6 rounded-2xl shadow-xl">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-4 border-b border-slate-800 gap-3">
+            <div>
+                <h2 class="text-lg font-semibold text-white flex items-center gap-2">
+                    <i data-lucide="wand-2" class="w-5 h-5 text-indigo-400"></i>
+                    Sintonización Automática basada en Modelo FOPDT (Fase 2)
+                </h2>
+                <p class="text-xs text-slate-400 mt-0.5">
+                    Modelo de Respuesta al Escalón: $G(s) = \frac{K e^{-\theta s}}{\tau s + 1}$ ($K = 0.1639$, $\tau = 242.96\text{ s}$, $\theta = 33.33\text{ s}$)
+                </p>
+            </div>
+            <div class="flex items-center gap-2">
+                <button onclick="ejecutarAutotune('OPTUNA')" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-xs transition-all shadow-lg shadow-indigo-600/30 flex items-center gap-1.5">
+                    <i data-lucide="sparkles" class="w-3.5 h-3.5"></i> Optuna Bayesian (ITAE)
+                </button>
+                <button onclick="ejecutarAutotune('COHEN_COON')" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium text-xs transition-all border border-slate-700 flex items-center gap-1.5">
+                    <i data-lucide="calculator" class="w-3.5 h-3.5"></i> Cohen-Coon Clásico
+                </button>
+            </div>
+        </div>
+
+        <div id="panel-resultado-autotune" class="mt-6 grid grid-cols-1 md:grid-cols-4 gap-4 p-4 rounded-xl bg-slate-900/90 border border-indigo-500/20">
+            <div>
+                <span class="text-xs text-slate-400 block">Método Activo</span>
+                <span class="text-base font-bold text-indigo-300 font-mono" id="at-metodo">OPTUNA_BAYESIAN</span>
+            </div>
+            <div>
+                <span class="text-xs text-slate-400 block">$K_p$ Calculado</span>
+                <span class="text-base font-bold text-emerald-400 font-mono" id="at-kp">15.934</span>
+            </div>
+            <div>
+                <span class="text-xs text-slate-400 block">$K_i$ Calculado</span>
+                <span class="text-base font-bold text-cyan-400 font-mono" id="at-ki">0.1359</span>
+            </div>
+            <div class="flex items-center justify-between">
+                <div>
+                    <span class="text-xs text-slate-400 block">$K_d$ Calculado</span>
+                    <span class="text-base font-bold text-amber-400 font-mono" id="at-kd">1.571</span>
+                </div>
+                <button onclick="aplicarGananaciasAutotune()" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-md flex items-center gap-1">
+                    <i data-lucide="check" class="w-3.5 h-3.5"></i> Aplicar
+                </button>
+            </div>
+        </div>
+        <p class="text-[11px] text-slate-500 mt-2 text-right" id="at-nota">
+            Métricas simuladas: Sobreimpulso $M_p = 4.2\%$, Tiempo de asentamiento $t_s = 285\text{ s}$.
+        </p>
+    </div>
+
+    <!-- Fila 3: Trazabilidad y Auditoría de Parámetros -->
+    <div class="glass-panel p-6 rounded-2xl shadow-xl">
+        <div class="flex items-center justify-between pb-4 border-b border-slate-800">
+            <h2 class="text-lg font-semibold text-white flex items-center gap-2">
+                <i data-lucide="history" class="w-5 h-5 text-slate-400"></i>
+                Registro de Auditoría de Cambios de Control (Tabla SQLite)
+            </h2>
+            <span class="text-xs text-slate-400">Últimos registros auditados</span>
+        </div>
+
+        <div class="overflow-x-auto mt-4">
+            <table class="w-full text-left text-xs text-slate-300">
+                <thead class="bg-slate-900 text-slate-400 uppercase font-mono text-[10px] border-b border-slate-800">
+                    <tr>
+                        <th class="py-3 px-4">Fecha y Hora</th>
+                        <th class="py-3 px-4">Usuario / Origen</th>
+                        <th class="py-3 px-4">Variable</th>
+                        <th class="py-3 px-4">Anterior</th>
+                        <th class="py-3 px-4">Nuevo</th>
+                        <th class="py-3 px-4">Kp / Ki / Kd</th>
+                        <th class="py-3 px-4">Justificación</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-800/60 font-sans" id="tabla-auditoria-cuerpo">
+                    {% for a in auditorias %}
+                    <tr class="hover:bg-slate-800/40 transition-colors">
+                        <td class="py-3 px-4 font-mono text-slate-400">{{ a.timestamp|date:"Y-m-d H:i:s" }}</td>
+                        <td class="py-3 px-4">
+                            <span class="px-2 py-0.5 rounded text-[10px] bg-slate-800 text-slate-300 border border-slate-700">
+                                {{ a.usuario_origen }}
+                            </span>
+                        </td>
+                        <td class="py-3 px-4 font-semibold text-slate-200">{{ a.variable_control }}</td>
+                        <td class="py-3 px-4 font-mono text-slate-400">{{ a.sp_anterior|floatformat:2|default:"--" }}</td>
+                        <td class="py-3 px-4 font-mono text-emerald-400">{{ a.sp_nuevo|floatformat:2|default:"--" }}</td>
+                        <td class="py-3 px-4 font-mono text-amber-300">
+                            {% if a.kp %}
+                            {{ a.kp|floatformat:3 }} / {{ a.ki|floatformat:4 }} / {{ a.kd|floatformat:3 }}
+                            {% else %}
+                            --
+                            {% endif %}
+                        </td>
+                        <td class="py-3 px-4 text-slate-400 max-w-xs truncate">{{ a.justificacion|default:"-" }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="py-6 text-center text-slate-500">No hay registros de auditoría aún.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    async function enviarSetpoints() {
+        const sp_temp = parseFloat(document.getElementById('input-sp-temp').value);
+        const sp_hum = parseFloat(document.getElementById('input-sp-hum').value);
+        const justificacion = document.getElementById('input-justificacion-sp').value || "Ajuste manual web";
+
+        try {
+            const resp = await fetch("{% url 'dashboard:api_setpoints' %}", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ sp_temperatura: sp_temp, sp_humedad: sp_hum, justificacion: justificacion })
+            });
+            const data = await resp.json();
+            if (data.status === "success") {
+                alert("✅ Setpoints guardados con éxito: " + data.mensaje);
+                location.reload();
+            } else {
+                alert("❌ Error al guardar setpoints: " + data.message);
+            }
+        } catch (err) {
+            alert("Error de conexión: " + err);
+        }
+    }
+
+    async function enviarPID() {
+        const kp = parseFloat(document.getElementById('input-kp').value);
+        const ki = parseFloat(document.getElementById('input-ki').value);
+        const kd = parseFloat(document.getElementById('input-kd').value);
+
+        try {
+            const resp = await fetch("{% url 'dashboard:api_pid' %}", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ kp: kp, ki: ki, kd: kd })
+            });
+            const data = await resp.json();
+            if (data.status === "success") {
+                alert("✅ Ganancias PID aplicadas: " + data.mensaje);
+                location.reload();
+            } else {
+                alert("❌ Error: " + data.message);
+            }
+        } catch (err) {
+            alert("Error de conexión: " + err);
+        }
+    }
+
+    let gananciaAutotunePendiente = null;
+
+    async function ejecutarAutotune(metodo) {
+        try {
+            const resp = await fetch("{% url 'dashboard:api_autotune' %}?metodo=" + metodo);
+            const data = await resp.json();
+            document.getElementById('at-metodo').innerText = data.metodo;
+            document.getElementById('at-kp').innerText = data.kp;
+            document.getElementById('at-ki').innerText = data.ki;
+            document.getElementById('at-kd').innerText = data.kd;
+            document.getElementById('at-nota').innerText = data.nota;
+            gananciaAutotunePendiente = { kp: data.kp, ki: data.ki, kd: data.kd };
+        } catch (err) {
+            alert("Error al ejecutar autotuning: " + err);
+        }
+    }
+
+    async function aplicarGananaciasAutotune() {
+        if (!gananciaAutotunePendiente) {
+            gananciaAutotunePendiente = {
+                kp: parseFloat(document.getElementById('at-kp').innerText),
+                ki: parseFloat(document.getElementById('at-ki').innerText),
+                kd: parseFloat(document.getElementById('at-kd').innerText)
+            };
+        }
+        document.getElementById('input-kp').value = gananciaAutotunePendiente.kp;
+        document.getElementById('input-ki').value = gananciaAutotunePendiente.ki;
+        document.getElementById('input-kd').value = gananciaAutotunePendiente.kd;
+        await enviarPID();
+    }
+</script>
+{% endblock %}

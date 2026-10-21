@@ -1,11 +1,12 @@
 # ==============================================================================
-# Docker Compose: Infraestructura IoT Base (Tesis Papa La Paz)
-# Servicios: Mosquitto Broker + InfluxDB v2 + Telegraf + Grafana
+# Docker Compose Completo: Infraestructura IoT, Inferencia y Control en Cascada
+# Proyecto de Tesis: Prototipo IoT-PID-IA para Cultivo de Papa (La Paz, Bolivia)
+# Servicios: Mosquitto + InfluxDB + Telegraf + Grafana + FastAPI + Inference Worker
 # ==============================================================================
 
 services:
   # ----------------------------------------------------------------------------
-  # 1. Eclipse Mosquitto: Broker MQTT para telemetría y control
+  # 1. Eclipse Mosquitto: Broker MQTT con Autenticación Obligatoria
   # ----------------------------------------------------------------------------
   mosquitto:
     image: eclipse-mosquitto:2.0.18
@@ -16,6 +17,7 @@ services:
       - "9001:9001"
     volumes:
       - ./config/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./config/mosquitto/passwd:/mosquitto/config/passwd:ro
       - mosquitto_data:/mosquitto/data
       - mosquitto_log:/mosquitto/log
     networks:
@@ -27,7 +29,7 @@ services:
       retries: 5
 
   # ----------------------------------------------------------------------------
-  # 2. InfluxDB v2: Almacenamiento optimizado de series de tiempo microclimáticas
+  # 2. InfluxDB v2: Almacenamiento de Series de Tiempo Microclimáticas
   # ----------------------------------------------------------------------------
   influxdb:
     image: influxdb:2.7.5-alpine
@@ -53,7 +55,7 @@ services:
       retries: 5
 
   # ----------------------------------------------------------------------------
-  # 3. Telegraf: Agente de ingesta automática (Suscripción MQTT -> InfluxDB v2)
+  # 3. Telegraf: Agente Colector MQTT -> InfluxDB v2 con Autenticación
   # ----------------------------------------------------------------------------
   telegraf:
     image: telegraf:1.30.0-alpine
@@ -68,13 +70,15 @@ services:
       - INFLUXDB_TOKEN=${INFLUXDB_TOKEN:-my-super-secret-admin-auth-token-tesis-2026-lapaz-bolivia}
       - INFLUXDB_ORG=${INFLUXDB_ORG:-agri_iot_tesis}
       - INFLUXDB_BUCKET=${INFLUXDB_BUCKET:-invernadero_data}
+      - MQTT_USERNAME=${MQTT_USERNAME:-telegraf_worker}
+      - MQTT_PASSWORD=${MQTT_PASSWORD:-TelegrafWorkerPass2026!}
     volumes:
       - ./config/telegraf/telegraf.conf:/etc/telegraf/telegraf.conf:ro
     networks:
       - red_invernadero
 
   # ----------------------------------------------------------------------------
-  # 4. Grafana: Visualización analítica de microclima y control PID
+  # 4. Grafana: Visualización Analítica y Paneles de Control
   # ----------------------------------------------------------------------------
   grafana:
     image: grafana/grafana:10.4.1
@@ -92,6 +96,70 @@ services:
     volumes:
       - grafana_data:/var/lib/grafana
       - ./config/grafana/provisioning:/etc/grafana/provisioning:ro
+    networks:
+      - red_invernadero
+
+  # ----------------------------------------------------------------------------
+  # 5. FastAPI Backend: Inferencia de Visión, Control de Setpoints y API REST
+  # ----------------------------------------------------------------------------
+  fastapi_server:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    container_name: iot_fastapi_server
+    restart: unless-stopped
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+      influxdb:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    environment:
+      - MQTT_BROKER_HOST=mosquitto
+      - MQTT_BROKER_PORT=1883
+      - MQTT_USERNAME=fastapi_server
+      - MQTT_PASSWORD=FastApiSecretPass2026!
+      - SQLITE_DB_PATH=/workspace/data/invernadero_relacional.db
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-}
+    volumes:
+      - ./data:/workspace/data
+      - ./server:/workspace/server
+    networks:
+      - red_invernadero
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  # ----------------------------------------------------------------------------
+  # 6. Worker de Inferencia: Lazo Supervisor en Cascada y Fusión Multimodal
+  # ----------------------------------------------------------------------------
+  inference_worker:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    container_name: iot_inference_worker
+    restart: unless-stopped
+    command: ["python", "-m", "server.app.worker"]
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+      fastapi_server:
+        condition: service_healthy
+    environment:
+      - MQTT_BROKER_HOST=mosquitto
+      - MQTT_BROKER_PORT=1883
+      - MQTT_USERNAME=fastapi_server
+      - MQTT_PASSWORD=FastApiSecretPass2026!
+      - SQLITE_DB_PATH=/workspace/data/invernadero_relacional.db
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-}
+    volumes:
+      - ./data:/workspace/data
+      - ./server:/workspace/server
     networks:
       - red_invernadero
 

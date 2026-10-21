@@ -1,0 +1,128 @@
+{% extends "dashboard/base.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
+                <i data-lucide="flask-conical" class="w-7 h-7 text-emerald-400"></i>
+                Protocolo y Registro de Ensayos Experimentales (E1 a E8)
+            </h1>
+            <p class="text-slate-400 text-sm mt-1">
+                Validación experimental formal para el manuscrito de tesis y sustentación de grado académico.
+            </p>
+        </div>
+        <div class="flex items-center gap-3">
+            <a href="{% url 'dashboard:exportar_csv' %}" class="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs transition-all shadow-lg shadow-emerald-600/30 flex items-center gap-2">
+                <i data-lucide="download" class="w-4 h-4"></i> Exportar Ensayos (CSV)
+            </a>
+        </div>
+    </div>
+
+    <!-- Tarjetas de Resumen Global -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="glass-panel p-4 rounded-xl border border-slate-800 flex items-center justify-between">
+            <div>
+                <span class="text-xs text-slate-400 block">Total Ensayos Formales</span>
+                <span class="text-xl font-bold text-white mt-1">8 Protocolos</span>
+            </div>
+            <div class="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
+                <i data-lucide="check-circle" class="w-5 h-5"></i>
+            </div>
+        </div>
+
+        <div class="glass-panel p-4 rounded-xl border border-slate-800 flex items-center justify-between">
+            <div>
+                <span class="text-xs text-slate-400 block">Horas Acumuladas</span>
+                <span class="text-xl font-bold text-cyan-400 mt-1">472.0 h</span>
+            </div>
+            <div class="w-10 h-10 rounded-xl bg-cyan-500/10 text-cyan-400 flex items-center justify-center">
+                <i data-lucide="clock" class="w-5 h-5"></i>
+            </div>
+        </div>
+
+        <div class="glass-panel p-4 rounded-xl border border-slate-800 flex items-center justify-between">
+            <div>
+                <span class="text-xs text-slate-400 block">Disponibilidad del Sistema</span>
+                <span class="text-xl font-bold text-indigo-400 mt-1">99.8 %</span>
+            </div>
+            <div class="w-10 h-10 rounded-xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center">
+                <i data-lucide="shield-check" class="w-5 h-5"></i>
+            </div>
+        </div>
+
+        <div class="glass-panel p-4 rounded-xl border border-slate-800 flex items-center justify-between">
+            <div>
+                <span class="text-xs text-slate-400 block">Mitigación de Heladas</span>
+                <span class="text-xl font-bold text-amber-400 mt-1">100 % Éxito</span>
+            </div>
+            <div class="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center">
+                <i data-lucide="snowflake" class="w-5 h-5"></i>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabla Detallada de Ensayos E1 a E8 -->
+    <div class="glass-panel p-6 rounded-2xl shadow-xl">
+        <div class="flex items-center justify-between pb-4 border-b border-slate-800">
+            <h2 class="text-lg font-semibold text-white flex items-center gap-2">
+                <i data-lucide="table" class="w-5 h-5 text-emerald-400"></i>
+                Matriz de Resultados Cuantitativos por Ensayo
+            </h2>
+            <span class="text-xs text-slate-400 font-mono">SQLite: experimentos_ensayos</span>
+        </div>
+
+        <div class="overflow-x-auto mt-4">
+            <table class="w-full text-left text-xs text-slate-300">
+                <thead class="bg-slate-900 text-slate-400 uppercase font-mono text-[10px] border-b border-slate-800">
+                    <tr>
+                        <th class="py-3.5 px-4">Código</th>
+                        <th class="py-3.5 px-4">Nombre del Ensayo</th>
+                        <th class="py-3.5 px-4">Tratamiento / Configuración</th>
+                        <th class="py-3.5 px-4">Duración</th>
+                        <th class="py-3.5 px-4">Fechas</th>
+                        <th class="py-3.5 px-4">Métricas Clave del Ensayo</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-800/60 font-sans">
+                    {% for e in ensayos %}
+                    <tr class="hover:bg-slate-800/40 transition-colors">
+                        <td class="py-4 px-4 font-mono font-bold text-emerald-400">
+                            <span class="px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-xs">
+                                {{ e.codigo_experimento }}
+                            </span>
+                        </td>
+                        <td class="py-4 px-4 font-semibold text-white">
+                            {{ e.nombre_ensayo }}
+                            <span class="block text-[11px] text-slate-400 font-normal mt-0.5">{{ e.observaciones }}</span>
+                        </td>
+                        <td class="py-4 px-4 text-slate-300">
+                            <span class="px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700 text-[11px]">
+                                {{ e.tratamiento }}
+                            </span>
+                        </td>
+                        <td class="py-4 px-4 font-mono text-cyan-400">
+                            {{ e.duracion_horas|floatformat:1 }} h
+                        </td>
+                        <td class="py-4 px-4 font-mono text-slate-400 text-[11px] whitespace-nowrap">
+                            {{ e.fecha_inicio|slice:":10" }} <br>
+                            <span class="text-slate-500">hasta {{ e.fecha_fin|slice:":10" }}</span>
+                        </td>
+                        <td class="py-4 px-4 font-mono text-xs max-w-sm">
+                            <div class="bg-slate-900/90 p-2.5 rounded-lg border border-slate-800 text-[10px] text-amber-300 overflow-x-auto whitespace-pre-wrap">
+                                {{ e.metricas_resumen_json }}
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="py-8 text-center text-slate-500">No hay ensayos registrados.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
