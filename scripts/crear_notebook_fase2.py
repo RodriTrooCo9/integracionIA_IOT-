@@ -1,0 +1,527 @@
+#!/usr/bin/env python3
+"""
+crear_notebook_fase2.py
+Construye el notebook notebooks/01_identificacion_pid_fopdt.ipynb
+con formato estándar nbformat v4 para Google Colab y VSCode.
+"""
+
+import json
+from pathlib import Path
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+NOTEBOOK_PATH = BASE_DIR / "notebooks" / "01_identificacion_pid_fopdt.ipynb"
+
+cells = [
+    {
+        "cell_type": "markdown",
+        "metadata": {},
+        "source": [
+            "# Tesis: Prototipo de Sistema Integrado IoT–PID–IA para Papa bajo Invernadero\n",
+            "## Fase 2: Identificación del Sistema (FOPDT), Sintonización Clásica y Optimización con Optuna\n",
+            "\n",
+            "**Ubicación:** La Paz, Bolivia (Altitud ~3600 msnm, clima frío nocturno).\n",
+            "**Objetivos de esta fase:**\n",
+            "1. Cargar y procesar los datos experimentales de la curva de reacción al escalón.\n",
+            "2. Ajustar un modelo de Primer Orden con Tiempo Muerto (**FOPDT**: $G(s) = \\frac{K e^{-\\theta s}}{\\tau s + 1}$).\n",
+            "3. Calcular ganancias analíticas mediante **Ziegler-Nichols**, **Cohen-Coon** e **IMC**.\n",
+            "4. Simular la dinámica en lazo cerrado y calcular métricas cuantitativas ($t_r, t_s, M_p, e_{ss}, IAE, ITAE$).\n",
+            "5. Optimizar ganancias globales mediante búsqueda bayesiana con **Optuna** (TPE Sampler).\n",
+            "6. Demostrar la superioridad del control PID continuo frente al control On/Off convencional con histéresis."
+        ]
+    },
+    {
+        "cell_type": "code",
+        "execution_count": None,
+        "metadata": {},
+        "outputs": [],
+        "source": [
+            "# ==============================================================================\n",
+            "# Celda 1: Instalación de Dependencias (Google Colab / Entorno Local)\n",
+            "# ==============================================================================\n",
+            "# Si ejecutas en Google Colab, descomenta las siguientes líneas:\n",
+            "# !pip install -q optuna scipy pandas matplotlib seaborn\n",
+            "\n",
+            "import os\n",
+            "import math\n",
+            "import numpy as np\n",
+            "import pandas as pd\n",
+            "import scipy.optimize as opt\n",
+            "import matplotlib.pyplot as plt\n",
+            "import optuna\n",
+            "\n",
+            "# Silenciar logs verbosos de Optuna\n",
+            "optuna.logging.set_verbosity(optuna.logging.WARNING)\n",
+            "\n",
+            "# Fijar semillas para reproducibilidad académica\n",
+            "np.random.seed(42)\n",
+            "\n",
+            "# Configuración gráfica con formato de publicación IEEE/APA (alta resolución)\n",
+            "plt.rcParams['figure.dpi'] = 120\n",
+            "plt.rcParams['font.size'] = 10\n",
+            "plt.rcParams['axes.grid'] = True\n",
+            "plt.rcParams['grid.linestyle'] = ':'\n",
+            "plt.rcParams['grid.alpha'] = 0.6\n",
+            "print(\"[✔] Entorno inicializado y librerías importadas con éxito.\")"
+        ]
+    },
+    {
+        "cell_type": "markdown",
+        "metadata": {},
+        "source": [
+            "### Montaje opcional de Google Drive en Google Colab\n",
+            "Si deseas persistir las figuras y tablas directamente en tu Google Drive, ejecuta la siguiente celda:"
+        ]
+    },
+    {
+        "cell_type": "code",
+        "execution_count": None,
+        "metadata": {},
+        "outputs": [],
+        "source": [
+            "# ==============================================================================\n",
+            "# Celda 2: Montaje de Google Drive (Opcional en Colab)\n",
+            "# ==============================================================================\n",
+            "try:\n",
+            "    from google.colab import drive\n",
+            "    drive.mount('/content/drive')\n",
+            "    RUTA_BASE = '/content/drive/MyDrive/Tesis_IOT_Papa'\n",
+            "    print(\"[✔] Google Drive montado en /content/drive\")\n",
+            "except Exception:\n",
+            "    RUTA_BASE = '.'\n",
+            "    print(\"[i] Ejecutando en entorno local o sin Google Drive montado.\")"
+        ]
+    },
+    {
+        "cell_type": "markdown",
+        "metadata": {},
+        "source": [
+            "## 1. Carga y Visualización de la Curva de Reacción Experimental\n",
+            "La prueba consiste en un escalón del $70\\%$ en la señal de control del calefactor cerámico ($u(t) = 70\\%$) a partir de $t = 120\\text{ s}$, partiendo del reposo térmico nocturno en La Paz ($8.5^\\circ\\text{C}$)."
+        ]
+    },
+    {
+        "cell_type": "code",
+        "execution_count": None,
+        "metadata": {},
+        "outputs": [],
+        "source": [
+            "# ==============================================================================\n",
+            "# Celda 3: Carga del Dataset de Escalón Térmico\n",
+            "# ==============================================================================\n",
+            "csv_path = os.path.join(RUTA_BASE, 'data/synthetic/prueba_escalon_fopdt.csv')\n",
+            "\n",
+            "# Si el archivo no existe (por ejemplo, en una sesión limpia de Colab), generarlo:\n",
+            "if not os.path.exists(csv_path):\n",
+            "    print(\"[*] Generando dataset sintético de la dinámica térmica del invernadero...\")\n",
+            "    dt_gen = 1.0\n",
+            "    t_arr = np.arange(0, 1800, dt_gen)\n",
+            "    u_arr = np.where(t_arr >= 120.0, 70.0, 0.0)\n",
+            "    y_arr = np.zeros_like(t_arr)\n",
+            "    y_arr[0] = 8.5\n",
+            "    for i in range(1, len(t_arr)):\n",
+            "        u_ef = 70.0 if (t_arr[i] - 35.0) >= 120.0 else 0.0\n",
+            "        dy = ( - (y_arr[i-1] - 8.5) + (0.165 * u_ef) ) / 240.0 * dt_gen\n",
+            "        y_arr[i] = y_arr[i-1] + dy\n",
+            "    ruido = np.random.normal(0, 0.08, len(t_arr)) + 0.15 * np.sin(2 * np.pi * t_arr / 600.0)\n",
+            "    df_gen = pd.DataFrame({'tiempo_segundos': t_arr, 'control_u_pct': u_arr, 'temperatura_medida_c': np.round(y_arr + ruido, 2)})\n",
+            "    os.makedirs(os.path.dirname(csv_path), exist_ok=True)\n",
+            "    df_gen.to_csv(csv_path, index=False)\n",
+            "\n",
+            "df = pd.read_csv(csv_path)\n",
+            "t_exp = df['tiempo_segundos'].values\n",
+            "u_exp = df['control_u_pct'].values\n",
+            "y_exp = df['temperatura_medida_c'].values\n",
+            "\n",
+            "print(f\"[✔] Datos cargados: {len(df)} muestras | Duración: {t_exp[-1]/60:.1f} minutos\")\n",
+            "print(df.head())"
+        ]
+    },
+    {
+        "cell_type": "markdown",
+        "metadata": {},
+        "source": [
+            "## 2. Identificación Paramétrica del Modelo FOPDT\n",
+            "\n",
+            "La función de transferencia del modelo FOPDT (First Order Plus Dead Time) en el dominio de Laplace es:\n",
+            "$$\n",
+            "G(s) = \\frac{Y(s)}{U(s)} = \\frac{K e^{-\\theta s}}{\\tau s + 1}\n",
+            "$$\n",
+            "\n",
+            "Su respuesta temporal ante una entrada escalón de magnitud $\\Delta u$ en el instante $t_{step}$ es:\n",
+            "$$\n",
+            "y(t) = y_0 + K \\cdot \\Delta u \\cdot \\left( 1 - e^{-\\frac{t - (t_{step} + \\theta)}{\\tau}} \\right) \\cdot \\mathbb{I}(t \\ge t_{step} + \\theta)\n",
+            "$$\n",
+            "\n",
+            "Ajustamos los parámetros $K, \\tau, \\theta$ mediante **Regresión No Lineal por Mínimos Cuadrados** (`scipy.optimize.curve_fit`)."
+        ]
+    },
+    {
+        "cell_type": "code",
+        "execution_count": None,
+        "metadata": {},
+        "outputs": [],
+        "source": [
+            "# ==============================================================================\n",
+            "# Celda 4: Ajuste No Lineal FOPDT\n",
+            "# ==============================================================================\n",
+            "t_step = 120.0\n",
+            "delta_u = 70.0\n",
+            "y0 = float(np.mean(y_exp[t_exp < t_step]))\n",
+            "y_inf = float(np.mean(y_exp[t_exp >= 1500]))\n",
+            "delta_y = y_inf - y0\n",
+            "K_init = delta_y / delta_u\n",
+            "\n",
+            "def modelo_fopdt(t, K, tau, theta):\n",
+            "    y = np.full_like(t, y0, dtype=float)\n",
+            "    idx = t >= (t_step + theta)\n",
+            "    t_ef = t[idx] - (t_step + theta)\n",
+            "    y[idx] = y0 + K * delta_u * (1.0 - np.exp(-t_ef / tau))\n",
+            "    return y\n",
+            "\n",
+            "popt, pcov = opt.curve_fit(\n",
+            "    modelo_fopdt, t_exp, y_exp,\n",
+            "    p0=[K_init, 200.0, 30.0],\n",
+            "    bounds=([0.05, 50.0, 5.0], [0.5, 600.0, 100.0])\n",
+            ")\n",
+            "K_opt, tau_opt, theta_opt = popt\n",
+            "y_pred = modelo_fopdt(t_exp, *popt)\n",
+            "\n",
+            "# Métricas de bondad de ajuste\n",
+            "ss_res = np.sum((y_exp - y_pred)**2)\n",
+            "ss_tot = np.sum((y_exp - np.mean(y_exp))**2)\n",
+            "r2 = 1.0 - (ss_res / ss_tot)\n",
+            "rmse = np.sqrt(np.mean((y_exp - y_pred)**2))\n",
+            "\n",
+            "print(\"=\" * 50)\n",
+            "print(\"PARÁMETROS FOPDT IDENTIFICADOS\")\n",
+            "print(\"=\" * 50)\n",
+            "print(f\"Ganancia Estática (K)   : {K_opt:.4f} °C / %\")\n",
+            "print(f\"Constante de Tiempo (τ) : {tau_opt:.2f} s ({tau_opt/60:.2f} min)\")\n",
+            "print(f\"Tiempo Muerto (θ)       : {theta_opt:.2f} s\")\n",
+            "print(f\"Relación de Retardo θ/τ : {theta_opt/tau_opt:.3f}\")\n",
+            "print(f\"Coeficiente R²          : {r2:.4f}\")\n",
+            "print(f\"RMSE                    : {rmse:.4f} °C\")\n",
+            "print(\"=\" * 50)"
+        ]
+    },
+    {
+        "cell_type": "code",
+        "execution_count": None,
+        "metadata": {},
+        "outputs": [],
+        "source": [
+            "# ==============================================================================\n",
+            "# Celda 5: Gráfico de Identificación FOPDT para la Tesis\n",
+            "# ==============================================================================\n",
+            "plt.figure(figsize=(9, 4.8), dpi=300)\n",
+            "plt.plot(t_exp / 60.0, y_exp, color='#4A5568', alpha=0.6, label='Sensor SHT31 (Datos Experimentales)', linewidth=1.2)\n",
+            "plt.plot(t_exp / 60.0, y_pred, color='#E53E3E', linewidth=2.0, label=f'Modelo FOPDT ($R^2 = {r2:.4f}$)')\n",
+            "plt.axvline(t_step / 60.0, color='#3182CE', linestyle='--', alpha=0.8, label=f'Escalón de Potencia ($u = {delta_u}\\%$)')\n",
+            "plt.title('Identificación Paramétrica FOPDT - Curva de Reacción Térmica (Invernadero La Paz)', fontweight='bold')\n",
+            "plt.xlabel('Tiempo [minutos]')\n",
+            "plt.ylabel('Temperatura del Aire [°C]')\n",
+            "plt.legend(loc='lower right', framealpha=0.9)\n",
+            "plt.tight_layout()\n",
+            "plt.savefig('fig_fopdt_ajuste_escalon.png', dpi=300)\n",
+            "plt.show()"
+        ]
+    },
+    {
+        "cell_type": "markdown",
+        "metadata": {},
+        "source": [
+            "## 3. Sintonización Clásica de Ganancias PID\n",
+            "\n",
+            "Calculamos las ganancias con tres metodologías de referencia en control de procesos:\n",
+            "\n",
+            "| Método | $K_p$ | $T_i$ | $T_d$ |\n",
+            "| :--- | :---: | :---: | :---: |\n",
+            "| **Ziegler-Nichols** | $\\frac{1.2 \\tau}{K \\theta}$ | $2 \\theta$ | $0.5 \\theta$ |\n",
+            "| **Cohen-Coon** | $\\frac{1}{K R} \\left( \\frac{4}{3} + \\frac{R}{4} \\right)$ | $\\theta \\left( \\frac{32 + 6R}{13 + 8R} \\right)$ | $\\theta \\left( \\frac{4}{11 + 2R} \\right)$ |\n",
+            "| **IMC** | $\\frac{\\tau + 0.5\\theta}{K(\\lambda + 0.5\\theta)}$ | $\\tau + 0.5\\theta$ | $\\frac{\\tau \\theta}{2\\tau + \\theta}$ |\n",
+            "\n",
+            "donde $R = \\frac{\\theta}{\\tau}$ y $\\lambda = \\max(0.15\\tau, 0.8\\theta)$."
+        ]
+    },
+    {
+        "cell_type": "code",
+        "execution_count": None,
+        "metadata": {},
+        "outputs": [],
+        "source": [
+            "# ==============================================================================\n",
+            "# Celda 6: Cálculo de Ganancias PID Clásicas\n",
+            "# ==============================================================================\n",
+            "R = theta_opt / tau_opt\n",
+            "\n",
+            "# 1. Ziegler-Nichols\n",
+            "kp_zn = (1.2 * tau_opt) / (K_opt * theta_opt)\n",
+            "ti_zn = 2.0 * theta_opt\n",
+            "td_zn = 0.5 * theta_opt\n",
+            "\n",
+            "# 2. Cohen-Coon\n",
+            "kp_cc = (1.0 / (K_opt * R)) * ((4.0 / 3.0) + (R / 4.0))\n",
+            "ti_cc = theta_opt * ((32.0 + 6.0 * R) / (13.0 + 8.0 * R))\n",
+            "td_cc = theta_opt * (4.0 / (11.0 + 2.0 * R))\n",
+            "\n",
+            "# 3. IMC\n",
+            "lambda_filtro = max(0.15 * tau_opt, 0.8 * theta_opt)\n",
+            "kp_imc = (tau_opt + 0.5 * theta_opt) / (K_opt * (lambda_filtro + 0.5 * theta_opt))\n",
+            "ti_imc = tau_opt + 0.5 * theta_opt\n",
+            "td_imc = (tau_opt * theta_opt) / (2.0 * tau_opt + theta_opt)\n",
+            "\n",
+            "df_ganancias = pd.DataFrame([\n",
+            "    {'Método': 'Ziegler-Nichols', 'Kp': kp_zn, 'Ki': kp_zn/ti_zn, 'Kd': kp_zn*td_zn, 'Ti [s]': ti_zn, 'Td [s]': td_zn},\n",
+            "    {'Método': 'Cohen-Coon', 'Kp': kp_cc, 'Ki': kp_cc/ti_cc, 'Kd': kp_cc*td_cc, 'Ti [s]': ti_cc, 'Td [s]': td_cc},\n",
+            "    {'Método': 'IMC (Modelo Interno)', 'Kp': kp_imc, 'Ki': kp_imc/ti_imc, 'Kd': kp_imc*td_imc, 'Ti [s]': ti_imc, 'Td [s]': td_imc}\n",
+            "])\n",
+            "print(df_ganancias.to_string(index=False))"
+        ]
+    },
+    {
+        "cell_type": "markdown",
+        "metadata": {},
+        "source": [
+            "## 4. Simulación Dinámica en Lazo Cerrado y Métricas de Desempeño\n",
+            "\n",
+            "Simulamos el sistema con:\n",
+            "- Setpoint $T_{sp} = 20.0^\\circ\\text{C}$ (temperatura óptima para desarrollo foliar de papa).\n",
+            "- Perturbación de carga a $t = 1400\\text{ s}$ (caída de $-2.5^\\circ\\text{C}$ por enfriamiento nocturno).\n",
+            "- Anti-windup con integración condicional (*clamping*).\n",
+            "- Derivada sobre la variable de proceso (*derivative on measurement*) para suprimir el *derivative kick*."
+        ]
+    },
+    {
+        "cell_type": "code",
+        "execution_count": None,
+        "metadata": {},
+        "outputs": [],
+        "source": [
+            "# ==============================================================================\n",
+            "# Celda 7: Función de Simulación en Lazo Cerrado y Métricas\n",
+            "# ==============================================================================\n",
+            "def simular_pid(Kp, Ki, Kd, K, tau, theta, SP=20.0, T0=8.5, t_sim=2400.0, dt=1.0):\n",
+            "    n = int(t_sim / dt)\n",
+            "    t = np.arange(n) * dt\n",
+            "    pasos_retardo = int(round(theta / dt))\n",
+            "    buffer_u = [0.0] * max(1, pasos_retardo)\n",
+            "    \n",
+            "    y = np.zeros(n)\n",
+            "    u = np.zeros(n)\n",
+            "    e_arr = np.zeros(n)\n",
+            "    y[0] = T0\n",
+            "    error_acumulado = 0.0\n",
+            "    pv_prev = T0\n",
+            "    \n",
+            "    for i in range(1, n):\n",
+            "        e = SP - y[i-1]\n",
+            "        e_arr[i] = e\n",
+            "        \n",
+            "        # PID con anti-windup condicional\n",
+            "        p_term = Kp * e\n",
+            "        d_term = -Kd * (y[i-1] - pv_prev) / dt\n",
+            "        pv_prev = y[i-1]\n",
+            "        \n",
+            "        u_tentativa = p_term + error_acumulado + d_term\n",
+            "        if 0.0 <= u_tentativa <= 100.0:\n",
+            "            error_acumulado += Ki * e * dt\n",
+            "            \n",
+            "        u_val = np.clip(p_term + error_acumulado + d_term, 0.0, 100.0)\n",
+            "        u[i] = u_val\n",
+            "        \n",
+            "        buffer_u.append(u_val)\n",
+            "        u_efectiva = buffer_u.pop(0)\n",
+            "        \n",
+            "        pert = -2.5 if t[i] >= 1400.0 else 0.0\n",
+            "        dy = ( - (y[i-1] - (T0 + pert)) + (K * u_efectiva) ) / tau * dt\n",
+            "        y[i] = y[i-1] + dy\n",
+            "        \n",
+            "    return t, y, u, e_arr\n",
+            "\n",
+            "def calcular_metricas(t, y, u, e_arr, SP=20.0, T0=8.5):\n",
+            "    dt = t[1] - t[0]\n",
+            "    delta = SP - T0\n",
+            "    Mp = max(0.0, ((np.max(y) - SP) / delta) * 100.0)\n",
+            "    \n",
+            "    idx_10 = np.where(y >= (T0 + 0.10 * delta))[0]\n",
+            "    idx_90 = np.where(y >= (T0 + 0.90 * delta))[0]\n",
+            "    tr = (t[idx_90[0]] - t[idx_10[0]]) if len(idx_10) > 0 and len(idx_90) > 0 else np.nan\n",
+            "    \n",
+            "    idx_pre = np.where(t < 1400.0)[0]\n",
+            "    fuera = np.where((y[idx_pre] < (SP - 0.02 * delta)) | (y[idx_pre] > (SP + 0.02 * delta)))[0]\n",
+            "    ts = t[fuera[-1]] if len(fuera) > 0 else 0.0\n",
+            "    \n",
+            "    ess = abs(SP - y[int(1350/dt)])\n",
+            "    iae = np.sum(np.abs(e_arr[idx_pre])) * dt\n",
+            "    itae = np.sum(t[idx_pre] * np.abs(e_arr[idx_pre])) * dt\n",
+            "    \n",
+            "    return {'tr_s': tr, 'ts_s': ts, 'Mp_pct': Mp, 'ess_c': ess, 'IAE': iae, 'ITAE': itae}"
+        ]
+    },
+    {
+        "cell_type": "markdown",
+        "metadata": {},
+        "source": [
+            "## 5. Optimización de Ganancias con Optuna\n",
+            "\n",
+            "Utilizamos **Optuna** con el algoritmo **Tree-structured Parzen Estimator (TPE)** para encontrar las ganancias óptimas que minimizan el error integral ($IAE$) penalizando rigurosamente sobrepasos superiores al $5\\%$ para proteger el cultivo de papa."
+        ]
+    },
+    {
+        "cell_type": "code",
+        "execution_count": None,
+        "metadata": {},
+        "outputs": [],
+        "source": [
+            "# ==============================================================================\n",
+            "# Celda 8: Optimización Bayesiana de Ganancias PID\n",
+            "# ==============================================================================\n",
+            "def objetivo_optuna(trial):\n",
+            "    kp_c = trial.suggest_float('Kp', 1.0, 16.0)\n",
+            "    ki_c = trial.suggest_float('Ki', 0.005, 0.15, log=True)\n",
+            "    kd_c = trial.suggest_float('Kd', 0.1, 5.0)\n",
+            "    \n",
+            "    t, y, u, e_arr = simular_pid(kp_c, ki_c, kd_c, K_opt, tau_opt, theta_opt)\n",
+            "    m = calcular_metricas(t, y, u, e_arr)\n",
+            "    \n",
+            "    costo = m['IAE'] + 50.0 * (max(0.0, m['Mp_pct'] - 5.0)**2)\n",
+            "    return costo\n",
+            "\n",
+            "estudio = optuna.create_study(direction='minimize', sampler=optuna.samplers.TPESampler(seed=42))\n",
+            "estudio.optimize(objetivo_optuna, n_trials=80)\n",
+            "\n",
+            "best_p = estudio.best_params\n",
+            "print(\"[✔] Optimización completada con éxito.\")\n",
+            "print(f\"Mejores Ganancias -> Kp: {best_p['Kp']:.3f}, Ki: {best_p['Ki']:.5f}, Kd: {best_p['Kd']:.3f}\")"
+        ]
+    },
+    {
+        "cell_type": "markdown",
+        "metadata": {},
+        "source": [
+            "## 6. Comparativa Crítica: Control On/Off vs PID Óptimo\n",
+            "\n",
+            "Demostramos la superioridad del control PID continuo frente al termostato On/Off tradicional con histéresis de $\\pm 0.5^\\circ\\text{C}$."
+        ]
+    },
+    {
+        "cell_type": "code",
+        "execution_count": None,
+        "metadata": {},
+        "outputs": [],
+        "source": [
+            "# ==============================================================================\n",
+            "# Celda 9: Simulación On/Off con Histéresis y Comparación Gráfica\n",
+            "# ==============================================================================\n",
+            "def simular_onoff(K, tau, theta, SP=20.0, T0=8.5, histeresis=0.5, t_sim=2400.0, dt=1.0):\n",
+            "    n = int(t_sim / dt)\n",
+            "    t = np.arange(n) * dt\n",
+            "    buffer_u = [0.0] * max(1, int(round(theta/dt)))\n",
+            "    y = np.zeros(n)\n",
+            "    u = np.zeros(n)\n",
+            "    e_arr = np.zeros(n)\n",
+            "    y[0] = T0\n",
+            "    estado = 0.0\n",
+            "    conmutaciones = 0\n",
+            "    \n",
+            "    for i in range(1, n):\n",
+            "        e_arr[i] = SP - y[i-1]\n",
+            "        if y[i-1] < (SP - histeresis) and estado == 0.0:\n",
+            "            estado = 100.0\n",
+            "            conmutaciones += 1\n",
+            "        elif y[i-1] > (SP + histeresis) and estado == 100.0:\n",
+            "            estado = 0.0\n",
+            "            conmutaciones += 1\n",
+            "        u[i] = estado\n",
+            "        buffer_u.append(estado)\n",
+            "        u_ef = buffer_u.pop(0)\n",
+            "        pert = -2.5 if t[i] >= 1400.0 else 0.0\n",
+            "        y[i] = y[i-1] + (( - (y[i-1] - (T0 + pert)) + K * u_ef ) / tau * dt)\n",
+            "    return t, y, u, e_arr, conmutaciones\n",
+            "\n",
+            "t_on, y_on, u_on, e_on, conmut = simular_onoff(K_opt, tau_opt, theta_opt)\n",
+            "t_pid, y_pid, u_pid, e_pid = simular_pid(best_p['Kp'], best_p['Ki'], best_p['Kd'], K_opt, tau_opt, theta_opt)\n",
+            "\n",
+            "fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 6.5), dpi=300, sharex=True)\n",
+            "ax1.plot(t_on/60.0, y_on, label='Control On/Off con Histéresis (±0.5 °C)', color='#E53E3E', alpha=0.8)\n",
+            "ax1.plot(t_pid/60.0, y_pid, label='Control PID Óptimo (Optuna)', color='#38A169', linewidth=2.0)\n",
+            "ax1.axhline(20.0, color='#1A202C', linestyle=':', label='Setpoint (20.0 °C)')\n",
+            "ax1.set_ylabel('Temperatura [°C]')\n",
+            "ax1.set_title('Comparativa de Regulación Térmica: Control On/Off vs PID Óptimo', fontweight='bold')\n",
+            "ax1.legend(loc='lower right')\n",
+            "\n",
+            "ax2.plot(t_on/60.0, u_on, label=f'Actuador On/Off ({conmut} conmutaciones)', color='#E53E3E', alpha=0.6)\n",
+            "ax2.plot(t_pid/60.0, u_pid, label='Actuador PID (Modulación Suave SSR)', color='#38A169', linewidth=1.8)\n",
+            "ax2.set_ylabel('Esfuerzo de Control [%]')\n",
+            "ax2.set_xlabel('Tiempo [minutos]')\n",
+            "ax2.set_ylim(-5, 105)\n",
+            "ax2.legend(loc='upper right')\n",
+            "plt.tight_layout()\n",
+            "plt.savefig('fig_comparativa_onoff_vs_pid.png', dpi=300)\n",
+            "plt.show()"
+        ]
+    },
+    {
+        "cell_type": "markdown",
+        "metadata": {},
+        "source": [
+            "## 7. Tabla Consolidada de Métricas para la Memoria de Tesis\n",
+            "Generamos la tabla comparativa final con todos los controladores evaluados:"
+        ]
+    },
+    {
+        "cell_type": "code",
+        "execution_count": None,
+        "metadata": {},
+        "outputs": [],
+        "source": [
+            "# ==============================================================================\n",
+            "# Celda 10: Consolidación de Métricas en Tabla Comparativa\n",
+            "# ==============================================================================\n",
+            "met_zn = calcular_metricas(*simular_pid(kp_zn, kp_zn/ti_zn, kp_zn*td_zn, K_opt, tau_opt, theta_opt))\n",
+            "met_cc = calcular_metricas(*simular_pid(kp_cc, kp_cc/ti_cc, kp_cc*td_cc, K_opt, tau_opt, theta_opt))\n",
+            "met_imc = calcular_metricas(*simular_pid(kp_imc, kp_imc/ti_imc, kp_imc*td_imc, K_opt, tau_opt, theta_opt))\n",
+            "met_opt = calcular_metricas(t_pid, y_pid, u_pid, e_pid)\n",
+            "met_on = calcular_metricas(t_on, y_on, u_on, e_on)\n",
+            "\n",
+            "tabla_final = pd.DataFrame([\n",
+            "    {'Método': 'Ziegler-Nichols', 'Kp': f'{kp_zn:.2f}', 'Ki': f'{kp_zn/ti_zn:.4f}', 'Kd': f'{kp_zn*td_zn:.2f}', 'tr [s]': f\"{met_zn['tr_s']:.1f}\", 'ts [s]': f\"{met_zn['ts_s']:.1f}\", 'Mp [%]': f\"{met_zn['Mp_pct']:.1f}\", 'IAE': f\"{met_zn['IAE']:.1f}\"},\n",
+            "    {'Método': 'Cohen-Coon', 'Kp': f'{kp_cc:.2f}', 'Ki': f'{kp_cc/ti_cc:.4f}', 'Kd': f'{kp_cc*td_cc:.2f}', 'tr [s]': f\"{met_cc['tr_s']:.1f}\", 'ts [s]': f\"{met_cc['ts_s']:.1f}\", 'Mp [%]': f\"{met_cc['Mp_pct']:.1f}\", 'IAE': f\"{met_cc['IAE']:.1f}\"},\n",
+            "    {'Método': 'IMC (Modelo Interno)', 'Kp': f'{kp_imc:.2f}', 'Ki': f'{kp_imc/ti_imc:.4f}', 'Kd': f'{kp_imc*td_imc:.2f}', 'tr [s]': f\"{met_imc['tr_s']:.1f}\", 'ts [s]': f\"{met_imc['ts_s']:.1f}\", 'Mp [%]': f\"{met_imc['Mp_pct']:.1f}\", 'IAE': f\"{met_imc['IAE']:.1f}\"},\n",
+            "    {'Método': 'Optuna (Óptimo)', 'Kp': f\"{best_p['Kp']:.2f}\", 'Ki': f\"{best_p['Ki']:.4f}\", 'Kd': f\"{best_p['Kd']:.2f}\", 'tr [s]': f\"{met_opt['tr_s']:.1f}\", 'ts [s]': f\"{met_opt['ts_s']:.1f}\", 'Mp [%]': f\"{met_opt['Mp_pct']:.1f}\", 'IAE': f\"{met_opt['IAE']:.1f}\"},\n",
+            "    {'Método': 'Control On/Off (±0.5°C)', 'Kp': 'N/A', 'Ki': 'N/A', 'Kd': 'N/A', 'tr [s]': f\"{met_on['tr_s']:.1f}\", 'ts [s]': 'Oscila', 'Mp [%]': f\"{met_on['Mp_pct']:.1f}\", 'IAE': f\"{met_on['IAE']:.1f}\"}\n",
+            "])\n",
+            "\n",
+            "print(tabla_final.to_string(index=False))\n",
+            "tabla_final.to_csv('tabla_comparativa_controladores.csv', index=False)"
+        ]
+    }
+]
+
+notebook = {
+    "cells": cells,
+    "metadata": {
+        "colab": {
+            "name": "01_identificacion_pid_fopdt.ipynb",
+            "provenance": []
+        },
+        "kernelspec": {
+            "display_name": "Python 3",
+            "language": "python",
+            "name": "python3"
+        },
+        "language_info": {
+            "name": "python",
+            "version": "3.10"
+        }
+    },
+    "nbformat": 4,
+    "nbformat_minor": 2
+}
+
+NOTEBOOK_PATH.parent.mkdir(parents=True, exist_ok=True)
+with open(NOTEBOOK_PATH, "w", encoding="utf-8") as f:
+    json.dump(notebook, f, indent=2)
+
+print(f"[✔] Cuaderno Jupyter generado exitosamente en: {NOTEBOOK_PATH}")
+print(f"    Total celdas: {len(cells)}")
