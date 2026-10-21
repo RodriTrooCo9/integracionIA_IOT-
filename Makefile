@@ -76,3 +76,19 @@ clean:
 	@echo "==> Limpiando archivos temporales y cachés de Python..."
 	@find . -type d -name "__pycache__" -exec rm -rf {} +
 	@rm -rf .pytest_cache
+
+ci: check test
+	@echo "==> [CI Local] Validando configuración de Docker Compose..."
+	@docker compose config --quiet
+	@echo "==> [CI Local] Validando sintaxis de código con flake8..."
+	@.venv/bin/flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics --exclude=.venv,backups,data,fases
+	@echo "✅ Pipeline CI local ejecutado con éxito total."
+
+version:
+	@echo "Versión de archivo: $$(cat VERSION)"
+	@echo "Último tag Git   : $$(git describe --tags --always 2>/dev/null || echo 'Sin tag')"
+
+branches:
+	@echo "Ramas locales activas:"
+	@git branch -v
+
