@@ -1,0 +1,54 @@
+name: Release Pipeline - Versionado Semántico y Publicación
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  create-release:
+    name: 🏷️ Generar Release y Publicar Entregables
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Clonar Repositorio
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 📝 Extraer Versión y Registro de Cambios
+        id: release_info
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/}"
+          echo "VERSION=${VERSION}" >> $GITHUB_OUTPUT
+          echo "Publicando versión: ${VERSION}"
+
+      - name: 📦 Crear Archivo de Despliegue Limpio
+        run: |
+          tar -czvf "iot-invernadero-${{ steps.release_info.outputs.VERSION }}.tar.gz" \
+            --exclude='.git' \
+            --exclude='.venv' \
+            --exclude='data/*.db' \
+            --exclude='data/raw/*' \
+            --exclude='fases' \
+            --exclude='backups' \
+            --exclude='__pycache__' \
+            config scripts server web Makefile docker-compose.yml requirements.txt README.md CHANGELOG.md VERSION
+
+      - name: 🚀 Crear GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: "Versión ${{ steps.release_info.outputs.VERSION }} - Prototipo IoT–PID–IA Invernadero Papa"
+          body: |
+            ### 🥔 Prototipo IoT–PID–IA para Cultivo de Papa en Invernadero (La Paz, 3600 msnm)
+            
+            Versión oficial generada automáticamente mediante pipeline de integración continua.
+            
+            Consulte [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) para detalles completos de características y métricas de validación.
+          files: |
+            iot-invernadero-${{ steps.release_info.outputs.VERSION }}.tar.gz
+          draft: false
+          prerelease: false
