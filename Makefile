@@ -8,8 +8,9 @@ PYTHON := .venv/bin/python3
 PYTEST := .venv/bin/pytest
 CLOUDFLARED := $(shell which cloudflared 2>/dev/null || echo ".venv/bin/cloudflared")
 PORT := 8000
+CLUSTER_DIR ?= $(HOME)/Documents/gitlabinf/GuiaImplementacion/infra-scripts
 
-.PHONY: all help init-db test check server tunnel run simulator docker-up clean
+.PHONY: all help init-db test check server tunnel tunnels run simulator docker-up clean
 
 # Objetivo por defecto: muestra ayuda
 help:
@@ -19,10 +20,11 @@ help:
 	@echo "Comandos disponibles:"
 	@echo "  make run        : Ejecuta TODO en orden (BD -> Test -> Django + Cloudflared)"
 	@echo "  make init-db    : Inicializa tablas SQLite y puebla ensayos E1 a E8"
-	@echo "  make test       : Ejecuta la suite completa de 23 pruebas Pytest"
+	@echo "  make test       : Ejecuta la suite completa de pruebas Pytest"
 	@echo "  make check      : Verifica el estado del sistema Django"
 	@echo "  make server     : Inicia únicamente el servidor web Django en el puerto $(PORT)"
 	@echo "  make tunnel     : Inicia únicamente el túnel seguro de Cloudflare"
+	@echo "  make tunnels    : Abre los túneles SSH del clúster (Grafana: localhost:3001)"
 	@echo "  make simulator  : Inicia el simulador de telemetría MQTT del ESP32"
 	@echo "  make docker-up  : Levanta los servicios de infraestructura Docker"
 	@echo "  make clean      : Limpia archivos temporales y caché de Python"
@@ -32,9 +34,10 @@ init-db:
 	@echo "==> [1/4] Inicializando esquema y datos en SQLite..."
 	@$(PYTHON) scripts/init_db.py
 	@$(PYTHON) scripts/seed_experiments.py
+	@$(PYTHON) web/manage.py migrate --run-syncdb --noinput
 
 test:
-	@echo "==> [2/4] Ejecutando suite de 23 pruebas unitarias y de integración..."
+	@echo "==> [2/4] Ejecutando suite de pruebas unitarias y de integración..."
 	@$(PYTEST) tests/ -v
 
 check:
@@ -48,6 +51,10 @@ server:
 tunnel:
 	@echo "==> Iniciando Cloudflare Tunnel hacia http://localhost:$(PORT)..."
 	@$(CLOUDFLARED) tunnel --url http://localhost:$(PORT)
+
+tunnels:
+	@test -f "$(CLUSTER_DIR)/scripts/client/tunnels.sh" || { echo "No se encontró el clúster en $(CLUSTER_DIR). Usa make tunnels CLUSTER_DIR=/ruta/infra-scripts"; exit 1; }
+	@$(MAKE) --no-print-directory -C "$(CLUSTER_DIR)" tunnels
 
 run: init-db test check
 	@echo "==> [4/4] Levantando servidor web Django y enlazando Cloudflare Tunnel..."

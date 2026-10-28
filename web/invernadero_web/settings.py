@@ -11,21 +11,42 @@ https://docs.djangoproject.com/en/6.1/ref/settings/
 """
 
 from pathlib import Path
+import os
+import sys
+import secrets
+from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(BASE_DIR.parent))
 
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-3ao*vr(&#iwr#)rt33y_0kn08i(&#y6e30sw(h#x6h+5x=qa)k"
-
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
-
-ALLOWED_HOSTS = ["*"]
+load_dotenv(BASE_DIR.parent / '.env')
+SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', '')
+if not SECRET_KEY:
+    key_file = BASE_DIR.parent / 'data' / 'django_secret.key'
+    key_file.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        fd = os.open(key_file, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    except FileExistsError:
+        pass
+    else:
+        with os.fdopen(fd, 'w') as output:
+            output.write(secrets.token_urlsafe(64))
+    SECRET_KEY = key_file.read_text().strip()
+DEBUG = os.getenv('DJANGO_DEBUG', 'false').lower() == 'true'
+ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1,[::1]').split(',')
+LOGIN_URL = '/accounts/login/'
+LOGIN_REDIRECT_URL = '/control-pid/'
+SESSION_COOKIE_HTTPONLY = True
+CSRF_COOKIE_SAMESITE = 'Lax'
+SESSION_COOKIE_SAMESITE = 'Lax'
+SESSION_COOKIE_SECURE = os.getenv('DJANGO_HTTPS', 'false').lower() == 'true'
+CSRF_COOKIE_SECURE = SESSION_COOKIE_SECURE
 
 # Application definition
 
@@ -41,10 +62,12 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "dashboard.middleware.MQTTLifecycleMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
-    "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "dashboard.middleware.UploadGuardMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
@@ -73,7 +96,8 @@ WSGI_APPLICATION = "invernadero_web.wsgi.application"
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR.parent / "data" / "invernadero_relacional.db",
+        "NAME": os.getenv("SQLITE_DB_PATH", str(BASE_DIR.parent / "data" / "invernadero_relacional.db")),
+        "OPTIONS": {"timeout": 15},
     }
 }
 
@@ -97,7 +121,7 @@ STATICFILES_DIRS = [BASE_DIR / "static"]
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
 MEDIA_URL = "/media/"
-MEDIA_ROOT = BASE_DIR.parent / "data" / "raw" / "uploads"
+MEDIA_ROOT = Path(os.getenv("UPLOAD_DIR", str(BASE_DIR.parent / "data" / "raw" / "uploads")))
 
 # Seguridad y CSRF para túneles remotos (Cloudflare / Ngrok)
 CSRF_TRUSTED_ORIGINS = [
@@ -107,3 +131,5 @@ CSRF_TRUSTED_ORIGINS = [
     "https://*.trycloudflare.com",
     "https://*.ngrok-free.app",
 ]
+
+CSRF_TRUSTED_ORIGINS += [v for v in os.getenv('DJANGO_CSRF_TRUSTED_ORIGINS', '').split(',') if v]

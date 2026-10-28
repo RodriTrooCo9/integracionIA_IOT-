@@ -23,12 +23,15 @@ WORKDIR /workspace
 
 # Copiar e instalar dependencias Python
 COPY server/requirements.txt /workspace/requirements.txt
+COPY server/requirements-vision.txt /workspace/requirements-vision.txt
+ARG INSTALL_VISION=false
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+    pip install --no-cache-dir -r requirements.txt && \
+    if [ "$INSTALL_VISION" = "true" ]; then pip install --no-cache-dir -r requirements-vision.txt; fi
 
 # Copiar código del servidor y scripts
 COPY server /workspace/server
-COPY data/invernadero_relacional.db /workspace/data/invernadero_relacional.db
+COPY scripts/init_db.py /workspace/scripts/init_db.py
 
 # Crear directorios para subida y procesamiento de imágenes
 RUN mkdir -p /workspace/data/raw/uploads /workspace/data/processed /workspace/data/models

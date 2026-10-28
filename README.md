@@ -1,7 +1,7 @@
 # Prototipo Integrado IoT–PID–IA para Papa bajo Invernadero (La Paz, Bolivia)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.11/3.12](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Docker Compose](https://img.shields.io/badge/docker--compose-v2+-blue)](https://docs.docker.com/compose/)
 [![PlatformIO](https://img.shields.io/badge/PlatformIO-ESP32-orange)](https://platformio.org/)
 
@@ -10,6 +10,12 @@ Repositorio oficial del proyecto de grado / tesis:
 *Contexto agronómico y geográfico:* Departamento de La Paz, Bolivia (altitud ~3600 msnm, clima frío nocturno, alta amplitud térmica y radiación solar diurna).
 
 ---
+
+## Correcciones de seguridad y funcionamiento
+
+Consulta [los cambios de la auditoría](docs/correcciones_auditoria_2026-10-28.md) antes de operar el equipo. El panel exige inicio de sesión para enviar órdenes y FastAPI exige `X-API-Key`. Las gráficas Django son una simulación identificada; la inferencia demostrativa nunca acciona el supervisor. Sin pesos propios, la inferencia real queda deshabilitada.
+
+Para instalar desde cero usa Python 3.11/3.12, `pip install -r requirements.txt`, configura `.env`, ejecuta `make init-db` y crea el operador con `python web/manage.py createsuperuser`. Las credenciales MQTT de la plantilla corresponden al broker de demostración incluido; deben rotarse conjuntamente con su archivo de contraseñas para un despliegue propio.
 
 ## 1. Arquitectura General del Sistema
 
@@ -114,7 +120,7 @@ IOTtesis/
 
 ### Prerrequisitos
 - Docker Engine 24+ y Docker Compose v2+
-- Python 3.10+
+- Python 3.11/3.12
 - Acceso a internet para descarga de imágenes de Docker
 
 ### Paso 1: Configurar Variables de Entorno
@@ -154,9 +160,9 @@ Consulta la especificación técnica completa en [`docs/especificacion_iot_proto
 Principales canales:
 - `invernadero/telemetria/microclima`: Temperatura, Humedad, Suelo, Luz, CO2, VPD, Punto de Rocío.
 - `invernadero/telemetria/pid`: Setpoint, Variable de Proceso, Señal de Control (%), Salidas PWM.
-- `invernadero/control/setpoint`: Comandos de ajuste remoto desde lazo IA o panel web.
-- `invernadero/vision/deteccion`: Conteo e inferencia de insectos en trampas amarillas (YOLO+SAHI).
-- `invernadero/alerta`: Eventos críticos canalizados al bot de Telegram.
+- `invernadero/control/setpoints`: Comandos de ajuste remoto desde lazo IA o panel web.
+- `invernadero/vision/detecciones`: Conteo e inferencia de insectos en trampas amarillas (YOLO+SAHI).
+- `invernadero/alarmas/eventos`: Eventos críticos canalizados al bot de Telegram.
 
 ---
 

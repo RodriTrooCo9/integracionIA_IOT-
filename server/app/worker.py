@@ -1,226 +1,194 @@
-"""
-Worker Asíncrono de Inferencia y Lazo Supervisor en Cascada
-Proyecto de Tesis - Invernadero de Papa (La Paz, Bolivia)
-
-Funcionalidad:
-1. Suscribe a telemetría de microclima y detecciones de visión en MQTT.
-2. Mantiene una ventana temporal deslizante.
-3. Ejecuta periódicamente la función de Fusión Multimodal de Riesgo.
-4. Si el nivel pasa a ALTO o CRÍTICO, comanda nuevos setpoints al ESP32 vía MQTT
-   y dispara alertas al bot de Telegram.
-"""
-
-import time
+"""Timestamp-based supervisor with stale-data protection and retryable commands."""
+import asyncio
 import json
 import logging
-import asyncio
-from datetime import datetime
+import math
+import threading
+import time
 from collections import deque
-import numpy as np
 
-import paho.mqtt.client as mqtt
 from server.app.core.config import settings
-from server.app.services.telegram_bot import telegram_service
 from server.app.services.database import db_service
+from server.app.services.mqtt_client import MQTTClientService
+from server.app.services.operations import comandar_control
+from server.app.services.telegram_bot import telegram_service
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] [WORKER]: %(message)s"
-)
-logger = logging.getLogger("inference_worker")
+logger = logging.getLogger('inference_worker')
+
 
 class SupervisorWorker:
     def __init__(self):
-        self.buffer_clima = deque(maxlen=48) # Buffer de 48 horas / muestras
-        self.ultima_deteccion_vision = {
-            "severidad_porcentaje": 0.0,
-            "conteo_insectos": 0,
-            "timestamp": time.time()
-        }
-        self.score_riesgo_actual = 0.15
-        self.nivel_actual = "BAJO"
-        
-        # Cliente MQTT dedicado para el Worker
-        try:
-            self.client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id="supervisor_inference_worker")
-        except AttributeError:
-            self.client = mqtt.Client(client_id="supervisor_inference_worker")
-            
-        if settings.MQTT_USERNAME and settings.MQTT_PASSWORD:
-            self.client.username_pw_set(settings.MQTT_USERNAME, settings.MQTT_PASSWORD)
-            
+        self.buffer_clima = deque(maxlen=48 * 60)
+        self.ultima_deteccion_vision = {'severidad_porcentaje': 0.0, 'conteo_insectos': 0, 'timestamp': 0}
+        self.transport = MQTTClientService()
+        self.client = self.transport.client
         self.client.on_connect = self._on_connect
         self.client.on_message = self._on_message
+        self.lock = threading.RLock()
+        self.last_climate = None
+        self.wet_hours = 0.0
+        self.score_riesgo_actual = 0.0
+        self.nivel_actual = 'SIN_DATOS'
+        self.applied_level = None  # Last broker-confirmed command, not device acknowledgement.
+        self.recovery_since = None
+        self.recovery_level = None
         self.running = False
 
     def _on_connect(self, client, userdata, flags, rc, properties=None):
+        self.transport._on_connect(client, userdata, flags, rc, properties)
         if rc == 0:
-            logger.info("Worker conectado a Mosquitto. Suscribiendo a telemetría y visión...")
             client.subscribe(settings.TOPIC_TELEMETRIA_CLIMA, qos=1)
             client.subscribe(settings.TOPIC_VISION_DETECCIONES, qos=1)
-        else:
-            logger.warning(f"Error conectando worker a MQTT: {rc}")
 
     def _on_message(self, client, userdata, msg):
         try:
-            payload = json.loads(msg.payload.decode("utf-8"))
-            if msg.topic == settings.TOPIC_TELEMETRIA_CLIMA:
-                self.buffer_clima.append({
-                    "timestamp": time.time(),
-                    "temp_in": float(payload.get("temp_aire", payload.get("temp_in", 18.0))),
-                    "hum_in": float(payload.get("hum_aire", payload.get("hum_in", 70.0))),
-                    "vpd_kpa": float(payload.get("vpd_kpa", 0.8)),
-                    "lwh": float(payload.get("lwh_continuo_horas", 0.0))
-                })
-            elif msg.topic == settings.TOPIC_VISION_DETECCIONES:
-                self.ultima_deteccion_vision = {
-                    "severidad_porcentaje": float(payload.get("severidad_porcentaje", 0.0)),
-                    "conteo_insectos": int(payload.get("conteo_insectos", 0)),
-                    "timestamp": time.time()
-                }
-        except Exception as e:
-            logger.error(f"Error parseando mensaje MQTT en tópico {msg.topic}: {e}")
+            payload = json.loads(msg.payload.decode('utf-8'))
+            now = time.time()
+            # Source time prevents replayed/retained packets from becoming fresh.
+            stamp = float(payload.get('timestamp', 0))
+            if not math.isfinite(stamp) or stamp > now + 10:
+                return
+            with self.lock:
+                if msg.topic == settings.TOPIC_TELEMETRIA_CLIMA:
+                    if now - stamp > settings.TELEMETRY_MAX_AGE_SECONDS:
+                        return
+                    if self.last_climate and stamp <= self.last_climate['timestamp']:
+                        return
+                    if payload.get('sensores_ok') is not True:
+                        self.last_climate = None
+                        self.wet_hours = 0.0
+                        return
+                    temp = float(payload['temp_aire'])
+                    hum = float(payload['hum_aire'])
+                    vpd = float(payload['vpd_kpa'])
+                    if not all(math.isfinite(v) for v in (temp, hum, vpd)) or not (-20 <= temp <= 60 and 0 <= hum <= 100 and 0 <= vpd <= 10):
+                        self.last_climate = None
+                        self.wet_hours = 0.0
+                        return
+                    previous = self.last_climate
+                    continuous = previous and 0 < stamp - previous['timestamp'] <= settings.TELEMETRY_MAX_AGE_SECONDS
+                    if continuous and hum >= 90 and previous['hum_in'] >= 90:
+                        self.wet_hours += (stamp - previous['timestamp']) / 3600
+                    else:
+                        self.wet_hours = 0.0
+                    sample = {'timestamp': stamp, 'temp_in': temp, 'hum_in': hum,
+                              'vpd_kpa': vpd, 'lwh': self.wet_hours}
+                    self.last_climate = sample
+                    cutoff = stamp - 48 * 3600
+                    while self.buffer_clima and self.buffer_clima[0]['timestamp'] < cutoff:
+                        self.buffer_clima.popleft()
+                    if self.buffer_clima and int(self.buffer_clima[-1]['timestamp'] // 60) == int(stamp // 60):
+                        self.buffer_clima[-1] = sample
+                    else:
+                        self.buffer_clima.append(sample)
+                elif msg.topic == settings.TOPIC_VISION_DETECCIONES:
+                    if payload.get('simulado', True) or now - stamp > settings.VISION_MAX_AGE_SECONDS:
+                        return
+                    if stamp <= self.ultima_deteccion_vision['timestamp']:
+                        return
+                    severity, count = float(payload['severidad_porcentaje']), int(payload['conteo_insectos'])
+                    if math.isfinite(severity) and 0 <= severity <= 100 and 0 <= count <= 100000:
+                        self.ultima_deteccion_vision = {'severidad_porcentaje': severity,
+                                                      'conteo_insectos': count, 'timestamp': stamp}
+        except (ValueError, TypeError, KeyError, UnicodeError):
+            logger.warning('Mensaje de supervisión inválido en %s', msg.topic)
 
-    def calcular_fusion_multimodal(self) -> tuple:
-        """
-        Calcula la Fusión Multimodal:
-        Score = 0.45 * Clima + 0.35 * Visión + 0.20 * Tendencia
-        """
-        # 1. Componente Climática (Blight Units / Horas de hoja húmeda continuas)
-        if len(self.buffer_clima) >= 6:
-            recientes = list(self.buffer_clima)[-12:]
-            hum_media = np.mean([m["hum_in"] for m in recientes])
-            lwh_max = np.max([m["lwh"] for m in recientes])
-            vpd_min = np.min([m["vpd_kpa"] for m in recientes])
-            
-            # Estimación heurística de riesgo fúngico
-            p_clima = 0.0
-            if lwh_max >= 10:
-                p_clima += 0.50
-            if hum_media >= 88.0:
-                p_clima += 0.30
-            if vpd_min <= 0.20:
-                p_clima += 0.20
-            p_clima = float(np.clip(p_clima, 0.0, 1.0))
+    def calcular_fusion_multimodal(self):
+        now = time.time()
+        with self.lock:
+            latest = dict(self.last_climate) if self.last_climate else None
+            recent = [dict(m) for m in self.buffer_clima if now - m['timestamp'] <= 12 * 3600]
+            vision = dict(self.ultima_deteccion_vision)
+        if latest is None or not 0 <= now - latest['timestamp'] <= settings.TELEMETRY_MAX_AGE_SECONDS:
+            return 0.0, 'SIN_DATOS', None, None, 'Telemetría no válida o vencida; sin órdenes automáticas.'
+        p_climate = (0.5 if latest['lwh'] >= 10 else 0)
+        p_climate += 0.3 if latest['hum_in'] >= 88 else 0
+        p_climate += 0.2 if latest['vpd_kpa'] <= 0.2 else 0
+        p_vision = 0.0
+        if 0 <= now - vision['timestamp'] <= settings.VISION_MAX_AGE_SECONDS:
+            p_vision = min(1.0, (vision['severidad_porcentaje'] / 20) * 0.65 + (vision['conteo_insectos'] / 25) * 0.35)
+        trend = 0.0
+        if len(recent) >= 2:
+            hours = (recent[-1]['timestamp'] - recent[0]['timestamp']) / 3600
+            if hours >= 1:
+                trend = max(0.0, min(1.0, (recent[-1]['hum_in'] - recent[0]['hum_in']) / hours / 15))
+        score = 0.45 * p_climate + 0.35 * p_vision + 0.20 * trend
+        if score < 0.30:
+            return score, 'BAJO', 18.0, 75.0, 'Monitoreo rutinario.'
+        if score < 0.55:
+            return score, 'MEDIO', 18.5, 70.0, 'Ventilación preventiva.'
+        if score < 0.75:
+            return score, 'ALTO', 19.5, 65.0, 'Deshumidificación activa; inspección del operador.'
+        return score, 'CRÍTICO', 20.0, 60.0, 'Extracción y evaluación fitosanitaria por el operador.'
+
+    async def evaluar_ciclo(self):
+        score, level, temp, hum, action = self.calcular_fusion_multimodal()
+        self.score_riesgo_actual, self.nivel_actual = score, level
+        await asyncio.to_thread(self.transport.publicar, settings.TOPIC_RIESGO_INDICE,
+                                {'timestamp': time.time(), 'score_riesgo': round(score, 3),
+                                 'nivel': level, 'datos_validos': level != 'SIN_DATOS',
+                                 'vision_vigente': time.time() - self.ultima_deteccion_vision['timestamp'] <= settings.VISION_MAX_AGE_SECONDS,
+                                 'horas_hoja_humeda': self.wet_hours, 'accion': action})
+        if level == 'SIN_DATOS':
+            self.recovery_since = None
+            return
+        ranks = {'BAJO': 0, 'MEDIO': 1, 'ALTO': 2, 'CRÍTICO': 3}
+        if self.applied_level is None and level not in {'ALTO', 'CRÍTICO'}:
+            return
+        if self.applied_level == level:
+            self.recovery_since = None
+            self.recovery_level = None
+            return
+        if self.applied_level and ranks[level] < ranks[self.applied_level]:
+            if self.recovery_since is None or self.recovery_level != level:
+                self.recovery_since = time.monotonic()
+                self.recovery_level = level
+            if time.monotonic() - self.recovery_since < settings.SUPERVISOR_RECOVERY_SECONDS:
+                return
         else:
-            p_clima = 0.20 # Valor nominal por defecto
-
-        # 2. Componente de Visión
-        sev = self.ultima_deteccion_vision["severidad_porcentaje"]
-        conteo = self.ultima_deteccion_vision["conteo_insectos"]
-        score_vision = min(1.0, (sev / 20.0) * 0.65 + (conteo / 25.0) * 0.35)
-
-        # 3. Componente de Tendencia Temporal (derivada en buffer)
-        if len(self.buffer_clima) >= 12:
-            hums = [m["hum_in"] for m in self.buffer_clima]
-            derivada_hum = (hums[-1] - hums[0]) / len(hums)
-            score_tend = float(np.clip(derivada_hum / 15.0, 0.0, 1.0))
-        else:
-            score_tend = 0.10
-
-        # Fusión ponderada
-        score_total = (0.45 * p_clima) + (0.35 * score_vision) + (0.20 * score_tend)
-        score_total = float(np.clip(score_total, 0.0, 1.0))
-
-        # Determinar nivel y setpoints recomendados
-        if score_total < 0.30:
-            nivel = "BAJO"
-            sp_temp, sp_hum = 18.0, 75.0
-            accion = "Monitoreo rutinario."
-        elif score_total < 0.55:
-            nivel = "MEDIO"
-            sp_temp, sp_hum = 18.5, 70.0
-            accion = "Ventilación preventiva diurna."
-        elif score_total < 0.75:
-            nivel = "ALTO"
-            sp_temp, sp_hum = 19.5, 65.0
-            accion = "Deshumidificación activa nocturna; inhibición de rocío."
-        else:
-            nivel = "CRÍTICO"
-            sp_temp, sp_hum = 20.0, 60.0
-            accion = "Protocolo de choque fitosanitario: extracción forzada y biofungicida."
-
-        return score_total, nivel, sp_temp, sp_hum, accion
+            self.recovery_since = None
+            self.recovery_level = None
+        result = await comandar_control({'sp_temperatura': temp, 'sp_humedad': hum},
+                                        'SISTEMA_IA_SUPERVISOR', f'Riesgo {level}: {score:.3f}',
+                                        publisher=self.transport.publicar)
+        if not result['publicado_mqtt']:
+            return  # Leave command pending for the next evaluation.
+        self.applied_level = level
+        await db_service.guardar_control_publicado({'supervisor_level': ranks[level]})
+        response = await telegram_service.enviar_alerta_con_foto(
+            titulo=f'Riesgo {level}', score_riesgo=score, nivel=level,
+            clima_resumen=f'Consigna publicada: {temp} °C / {hum}%. Aplicación no confirmada.',
+            accion_recomendada=action)
+        await db_service.registrar_evento_alarma(
+            tipo_evento=f'RIESGO_FITOSANITARIO_{level}', nivel_severidad=level,
+            mensaje=action, valor_disparador=score,
+            accion_ejecutada='SETPOINT_PUBLICADO_BROKER', notificado_telegram=response.get('ok') is True)
 
     async def ciclo_supervision(self):
-        """Bucle periódico de evaluación y control en cascada."""
         self.running = True
-        logger.info("Iniciando bucle de supervisión en cascada (período: 30 segundos)...")
-        
+        stored = await db_service.obtener_control_publicado('supervisor_level')
+        if stored is not None:
+            self.applied_level = {0: 'BAJO', 1: 'MEDIO', 2: 'ALTO', 3: 'CRÍTICO'}.get(stored)
         while self.running:
             try:
-                score, nivel, sp_t, sp_h, accion = self.calcular_fusion_multimodal()
-                self.score_riesgo_actual = score
-                
-                # Publicar índice de riesgo en MQTT
-                payload_riesgo = {
-                    "timestamp": datetime.now().isoformat(),
-                    "score_riesgo": round(score, 3),
-                    "nivel": nivel,
-                    "sp_temperatura_sugerido": sp_t,
-                    "sp_humedad_sugerido": sp_h,
-                    "accion": accion
-                }
-                self.client.publish(settings.TOPIC_RIESGO_INDICE, json.dumps(payload_riesgo), qos=1)
-
-                # Si el nivel es ALTO o CRÍTICO, comanda setpoints en cascada
-                if nivel in ["ALTO", "CRÍTICO"] and nivel != self.nivel_actual:
-                    logger.warning(f"¡Cambio de estado fitosanitario a {nivel}! Score: {score:.3f}. Ajustando setpoints...")
-                    
-                    # 1. Comandar setpoints al ESP32 vía MQTT
-                    payload_sp = {
-                        "sp_temperatura": sp_t,
-                        "sp_humedad": sp_h,
-                        "usuario_origen": "SISTEMA_IA_SUPERVISOR",
-                        "timestamp": datetime.now().isoformat()
-                    }
-                    self.client.publish(settings.TOPIC_CONTROL_SETPOINTS, json.dumps(payload_sp), qos=1, retain=True)
-
-                    # 2. Registrar en base de datos
-                    await db_service.registrar_auditoria_setpoint(
-                        variable_control="TEMPERATURA_Y_HUMEDAD",
-                        sp_anterior=18.0,
-                        sp_nuevo=sp_t,
-                        usuario_origen="SISTEMA_IA_SUPERVISOR",
-                        justificacion=f"Lazo externo IA por riesgo {nivel} (Score: {score:.3f}) | SP_Hum: {sp_h}%"
-                    )
-                    await db_service.registrar_evento_alarma(
-                        tipo_evento=f"RIESGO_FITOSANITARIO_{nivel}",
-                        nivel_severidad=nivel,
-                        mensaje=f"Riesgo fúngico elevado. Setpoint temp ajustado a {sp_t}°C y humedad a {sp_h}%.",
-                        valor_disparador=score,
-                        accion_ejecutada="AJUSTE_SETPOINTS_Y_TELEGRAM",
-                        notificado_telegram=True
-                    )
-
-                    # 3. Notificar a Telegram
-                    resumen_clima = f"• Nivel: `{nivel}` | Score: `{score:.3f}`\n• SP Temp comandado: `{sp_t}°C`\n• SP Hum comandado: `{sp_h}%`"
-                    await telegram_service.enviar_alerta_con_foto(
-                        titulo=f"Transición a Riesgo {nivel}",
-                        score_riesgo=score,
-                        nivel=nivel,
-                        clima_resumen=resumen_clima,
-                        accion_recomendada=accion
-                    )
-
-                self.nivel_actual = nivel
-
-            except Exception as e:
-                logger.error(f"Error en ciclo de supervisión: {e}")
-
-            await asyncio.sleep(15) # Evaluación periódica
+                await self.evaluar_ciclo()
+            except Exception:
+                logger.exception('Error en supervisión')
+            await asyncio.sleep(settings.SUPERVISOR_PERIOD_SECONDS)
 
     def iniciar(self):
+        from server.app.services.bootstrap import inicializar_db
+        inicializar_db()
+        self.transport.iniciar()
         try:
-            self.client.connect_async(settings.MQTT_BROKER_HOST, settings.MQTT_BROKER_PORT, keepalive=60)
-            self.client.loop_start()
             asyncio.run(self.ciclo_supervision())
         except KeyboardInterrupt:
-            logger.info("Deteniendo worker...")
+            pass
+        finally:
             self.running = False
-            self.client.loop_stop()
-            self.client.disconnect()
+            self.transport.detener()
 
-if __name__ == "__main__":
-    worker = SupervisorWorker()
-    worker.iniciar()
+
+if __name__ == '__main__':
+    logging.basicConfig(level=logging.INFO)
+    SupervisorWorker().iniciar()

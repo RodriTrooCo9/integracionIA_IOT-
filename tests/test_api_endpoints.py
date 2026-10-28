@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 from server.app.main import app
 from server.app.core.config import settings
 
-client = TestClient(app)
+client = TestClient(app, headers={"X-API-Key": "test-operator-key"})
 
 def test_root():
     response = client.get("/")
@@ -38,7 +38,7 @@ def test_actualizar_setpoints_valido():
     response = client.post("/api/v1/control/setpoints", json=payload)
     assert response.status_code == 200
     data = response.json()
-    assert data["status"] == "success"
+    assert data["status"] == "published"
     assert data["sp_temperatura"] == 19.5
     assert data["sp_humedad"] == 68.0
 

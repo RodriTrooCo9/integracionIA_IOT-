@@ -81,7 +81,7 @@ jobs:
           python scripts/init_db.py
           python scripts/seed_experiments.py
 
-      - name: 🚀 Ejecutar Pytest (23 Pruebas de API, Django, MQTT y Fusión)
+      - name: 🚀 Ejecutar Pytest (API, Django, MQTT, Fusión y Regresiones)
         run: |
           pytest tests/ -v --junitxml=junit/test-results.xml
 
@@ -95,7 +95,6 @@ jobs:
   firmware-validation:
     name: ⚡ Validación de Código Firmware ESP32
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - name: 📥 Clonar Repositorio
         uses: actions/checkout@v4
@@ -107,10 +106,10 @@ jobs:
 
       - name: 🛠️ Instalar PlatformIO CLI
         run: |
-          pip install --upgrade platformio
+          pip install platformio==6.1.18
 
       - name: 🔨 Compilar y Verificar Firmware ESP32
         run: |
           cd firmware/esp32_control
-          pio check --fail-on-defect=high || true
+          pio run
           echo "✅ Sintaxis y estructura de firmware ESP32 verificada."

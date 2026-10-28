@@ -4,6 +4,7 @@
 // ==============================================================================
 
 #include <Arduino.h>
+#include <time.h>
 #include <WiFi.h>
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
@@ -14,6 +15,7 @@
 #include <BH1750.h>
 #include <esp_task_wdt.h>
 #include "config_invernadero.h"
+#include "control_safety.h"
 
 // ------------------------------------------------------------------------------
 // Instancias de Hardware y Sensores
@@ -35,7 +37,11 @@ float hum_suelo_pct = 60.0f;
 float luz_lux_val = 0.0f;
 float vpd_kpa = 0.6f;
 float punto_rocio = 12.0f;
-bool sensores_ok = true;
+bool sensores_ok = false;
+unsigned long ultima_lectura_valida = 0;
+bool humidificador_activo = false;
+unsigned long t_conversion_suelo = 0;
+portMUX_TYPE control_mux = portMUX_INITIALIZER_UNLOCKED;
 
 // Filtro EMA (Exponential Moving Average): y[k] = alpha * x[k] + (1 - alpha) * y[k-1]
 const float EMA_ALPHA_TEMP = 0.15f;
@@ -62,7 +68,7 @@ float termino_d = 0.0f;
 float cv_salida = 0.0f;
 float pv_previa = 18.0f; // Para derivada sobre la medida (anti-derivative kick)
 bool antiwindup_activo = false;
-String modo_operativo = "AUTO"; // "AUTO", "MANUAL", "AUTOTUNE", "SAFE"
+volatile bool modo_auto = true; // Only AUTO and SAFE are supported.
 
 // ------------------------------------------------------------------------------
 // Temporizadores y Ventanas de Modulación
@@ -112,7 +118,7 @@ float calcular_punto_rocio(float temp, float hum) {
 
 void leer_sensores() {
     // 1. SHT31 (Temperatura y Humedad del aire por I2C)
-    if (sht31.read()) {
+    if (sht31.read(false) && lectura_aire_valida(sht31.getTemperature(), sht31.getHumidity())) {
         temp_aire_raw = sht31.getTemperature();
         hum_aire_raw = sht31.getHumidity();
 
@@ -121,14 +127,19 @@ void leer_sensores() {
         temp_aire_filtrada = (EMA_ALPHA_TEMP * temp_sin_picos) + ((1.0f - EMA_ALPHA_TEMP) * temp_aire_filtrada);
         hum_aire_filtrada = (EMA_ALPHA_HUM * hum_aire_raw) + ((1.0f - EMA_ALPHA_HUM) * hum_aire_filtrada);
         sensores_ok = true;
+        ultima_lectura_valida = millis();
     } else {
         sensores_ok = false;
         Serial.println(F("[ERROR] Falla de lectura en sensor SHT31"));
     }
 
     // 2. DS18B20 (Temperatura edáfica en suelo)
-    sensorSuelo.requestTemperatures();
-    float temp_suelo_raw = sensorSuelo.getTempCByIndex(0);
+    float temp_suelo_raw = DEVICE_DISCONNECTED_C;
+    if (millis() - t_conversion_suelo >= 750) {
+        temp_suelo_raw = sensorSuelo.getTempCByIndex(0);
+        sensorSuelo.requestTemperatures();
+        t_conversion_suelo = millis();
+    }
     if (temp_suelo_raw > -50.0f && temp_suelo_raw < 80.0f) {
         temp_suelo_filtrada = (EMA_ALPHA_SUELO * temp_suelo_raw) + ((1.0f - EMA_ALPHA_SUELO) * temp_suelo_filtrada);
     }
@@ -151,9 +162,35 @@ void leer_sensores() {
 // 2. CONTROLADOR PID DISCRETO CON SPLIT-RANGE Y ANTI-WINDUP
 // ==============================================================================
 
-void ejecutar_control_pid() {
-    float dt = PERIODO_PID_MS / 1000.0f; // dt = 0.1 s
-    error_actual = setpoint_temperatura - temp_aire_filtrada;
+void apagar_actuadores() {
+    digitalWrite(PIN_SSR_CALEFACTOR, LOW);
+    ledcWrite(PWM_LEDC_CHANNEL, 0);
+    digitalWrite(PIN_RELE_HUMIDIF, HIGH);
+    digitalWrite(PIN_RELE_BOMBA, HIGH);
+    humidificador_activo = false;
+    termino_i = 0;
+    cv_salida = 0;
+    pv_previa = temp_aire_filtrada;
+}
+
+void ejecutar_control_pid(float dt) {
+    if (!control_habilitado(modo_auto, sensores_ok, millis() - ultima_lectura_valida)) {
+        apagar_actuadores();
+        return;
+    }
+    // Raw temperature limit bypasses the filter and the PID integral.
+    if (temp_aire_raw >= 35.0f) {
+        apagar_actuadores();
+        ledcWrite(PWM_LEDC_CHANNEL, 255);
+        cv_salida = -100;
+        return;
+    }
+    float local_sp, local_hum, local_kp, local_ki, local_kd;
+    portENTER_CRITICAL(&control_mux);
+    local_sp = setpoint_temperatura; local_hum = setpoint_humedad;
+    local_kp = kp; local_ki = ki; local_kd = kd;
+    portEXIT_CRITICAL(&control_mux);
+    error_actual = local_sp - temp_aire_filtrada;
 
     // Aplicación de banda muerta para evitar oscilación innecesaria de actuadores
     if (abs(error_actual) < PID_DEADBAND_TEMP) {
@@ -161,12 +198,12 @@ void ejecutar_control_pid() {
     }
 
     // 1. Término Proporcional
-    termino_p = kp * error_actual;
+    termino_p = local_kp * error_actual;
 
     // 2. Término Derivativo sobre la Medida (Anti-Derivative Kick)
     // d(error)/dt = d(SP - PV)/dt = - d(PV)/dt cuando SP es constante
     float derivada_pv = (temp_aire_filtrada - pv_previa) / dt;
-    termino_d = -kd * derivada_pv;
+    termino_d = -local_kd * derivada_pv;
     pv_previa = temp_aire_filtrada;
 
     // 3. Término Integral con Anti-Windup (Clamping Condicional)
@@ -175,7 +212,7 @@ void ejecutar_control_pid() {
     bool saturado_bajo = (cv_salida <= PID_CV_MIN && error_actual < 0);
 
     if (!saturado_alto && !saturado_bajo) {
-        termino_i += ki * error_actual * dt;
+        termino_i += local_ki * error_actual * dt;
         antiwindup_activo = false;
     } else {
         antiwindup_activo = true;
@@ -207,6 +244,19 @@ void ejecutar_control_pid() {
         pwm_calefactor = 0.0f;
         pwm_extractor = 0.0f;
     }
+
+    // Humidity hysteresis. Water output is interlocked with the external float switch.
+    const bool agua_ok = digitalRead(PIN_DIGITAL_FLOTADOR) == PIN_FLOTADOR_AGUA_OK;
+    if (hum_aire_filtrada < local_hum - 2.0f) humidificador_activo = true;
+    if (hum_aire_filtrada > local_hum + 2.0f || !agua_ok) humidificador_activo = false;
+    if (hum_aire_filtrada > local_hum + 2.0f) {
+        pwm_extractor = max(pwm_extractor, min(60.0f, (hum_aire_filtrada - local_hum) * 5.0f));
+    }
+    // Prevent simultaneous humidification/extraction and cold-air extraction near 5 °C.
+    if (temp_aire_raw <= 5.0f) pwm_extractor = 0;
+    if (pwm_extractor > 0) humidificador_activo = false;
+    digitalWrite(PIN_RELE_HUMIDIF, humidificador_activo ? LOW : HIGH);
+    digitalWrite(PIN_RELE_BOMBA, HIGH); // Irrigation has no implemented controller.
 
     // A. Extractor PWM (LEDC a 25 kHz, 8 bits: 0 a 255)
     uint32_t duty_extractor = (uint32_t)((pwm_extractor / 100.0f) * 255.0f);
@@ -244,35 +294,45 @@ void callback_mqtt(char* topic, byte* payload, unsigned int length) {
         return;
     }
 
-    String topico_recibido = String(topic);
-
-    // 1. Recepción de nuevo Setpoint desde lazo externo (IA o Web)
-    if (topico_recibido == TOPIC_CONTROL_SP) {
-        if (doc.containsKey("sp_temp")) {
-            setpoint_temperatura = doc["sp_temp"].as<float>();
-            Serial.print(F("[MQTT] Setpoint Temp actualizado: "));
-            Serial.print(setpoint_temperatura);
-            Serial.println(F(" °C"));
-        }
-        if (doc.containsKey("sp_hum")) {
-            setpoint_humedad = doc["sp_hum"].as<float>();
-            Serial.print(F("[MQTT] Setpoint Humedad actualizado: "));
-            Serial.println(setpoint_humedad);
-        }
+    const time_t now = time(nullptr);
+    const int64_t expiry = doc["expires_at"] | int64_t(0);
+    if (now < 1700000000 || expiry < now || expiry > now + 300) {
+        Serial.println(F("[MQTT] Comando vencido o reloj no sincronizado"));
+        return;
     }
-    // 2. Recepción de nuevas Ganancias PID
-    else if (topico_recibido == TOPIC_CONTROL_GANANCIAS) {
-        if (doc.containsKey("kp")) kp = doc["kp"].as<float>();
-        if (doc.containsKey("ki")) ki = doc["ki"].as<float>();
-        if (doc.containsKey("kd")) kd = doc["kd"].as<float>();
-        Serial.printf("[MQTT] Ganancias actualizadas -> Kp: %.2f, Ki: %.4f, Kd: %.2f\n", kp, ki, kd);
+    String received(topic);
+    bool accepted = false;
+    if (received == TOPIC_CONTROL_SP) {
+        if (!doc["sp_temperatura"].is<float>() || !doc["sp_humedad"].is<float>()) return;
+        float t = doc["sp_temperatura"], h = doc["sp_humedad"];
+        if (!setpoints_validos(t, h)) return;
+        portENTER_CRITICAL(&control_mux);
+        setpoint_temperatura = t; setpoint_humedad = h;
+        portEXIT_CRITICAL(&control_mux);
+        accepted = true;
+    } else if (received == TOPIC_CONTROL_GANANCIAS) {
+        if (!doc["kp"].is<float>() || !doc["ki"].is<float>() || !doc["kd"].is<float>()) return;
+        float p = doc["kp"], i = doc["ki"], d = doc["kd"];
+        if (!ganancias_validas(p, i, d)) return;
+        portENTER_CRITICAL(&control_mux);
+        kp = p; ki = i; kd = d;
+        portEXIT_CRITICAL(&control_mux);
+        accepted = true;
+    } else if (received == TOPIC_CONTROL_MODO) {
+        String mode = doc["modo"] | "";
+        if (mode != "AUTO" && mode != "SAFE") return;
+        modo_auto = mode == "AUTO";
+        accepted = true;
     }
-    // 3. Recepción de Modo Operativo
-    else if (topico_recibido == TOPIC_CONTROL_MODO) {
-        if (doc.containsKey("modo")) {
-            modo_operativo = doc["modo"].as<String>();
-            Serial.printf("[MQTT] Modo operativo fijado a: %s\n", modo_operativo.c_str());
-        }
+    if (accepted) {
+        StaticJsonDocument<256> ack;
+        ack["command_id"] = doc["command_id"] | "";
+        ack["estado"] = "RECIBIDO";
+        ack["sp_temperatura"] = setpoint_temperatura;
+        ack["sp_humedad"] = setpoint_humedad;
+        ack["timestamp"] = int64_t(now);
+        char response[256]; serializeJson(ack, response);
+        mqttClient.publish(TOPIC_CONTROL_ESTADO, response);
     }
 }
 
@@ -285,7 +345,7 @@ void reconectar_mqtt() {
         t_ultimo_intento_mqtt = t_ahora;
         Serial.print(F("[*] Conectando a Broker MQTT... "));
 
-        if (mqttClient.connect(MQTT_CLIENT_ID)) {
+        if (mqttClient.connect(MQTT_CLIENT_ID, MQTT_USERNAME, MQTT_PASSWORD)) {
             Serial.println(F("Conectado con éxito."));
             mqttClient.subscribe(TOPIC_CONTROL_SP);
             mqttClient.subscribe(TOPIC_CONTROL_GANANCIAS);
@@ -305,7 +365,8 @@ void publicar_telemetria() {
     StaticJsonDocument<512> doc_clima;
     doc_clima["nodo_id"] = MQTT_CLIENT_ID;
     doc_clima["zona"] = "zona_a_central";
-    doc_clima["timestamp_ms"] = (uint64_t)millis();
+    doc_clima["timestamp"] = (int64_t)time(nullptr);
+    doc_clima["uptime_ms"] = (uint64_t)millis();
     doc_clima["temp_aire"] = round(temp_aire_filtrada * 100.0f) / 100.0f;
     doc_clima["hum_aire"] = round(hum_aire_filtrada * 100.0f) / 100.0f;
     doc_clima["temp_suelo"] = round(temp_suelo_filtrada * 100.0f) / 100.0f;
@@ -322,16 +383,17 @@ void publicar_telemetria() {
     // 2. Mensaje de Control PID
     StaticJsonDocument<512> doc_pid;
     doc_pid["nodo_id"] = MQTT_CLIENT_ID;
-    doc_pid["timestamp_ms"] = (uint64_t)millis();
+    doc_pid["timestamp"] = (int64_t)time(nullptr);
     doc_pid["variable"] = "TEMPERATURA";
     doc_pid["sp_temp"] = setpoint_temperatura;
+    doc_pid["sp_hum"] = setpoint_humedad;
     doc_pid["pv_temp"] = round(temp_aire_filtrada * 100.0f) / 100.0f;
     doc_pid["error"] = round(error_actual * 100.0f) / 100.0f;
     doc_pid["cv_salida"] = round(cv_salida * 10.0f) / 10.0f;
     doc_pid["termino_p"] = round(termino_p * 10.0f) / 10.0f;
     doc_pid["termino_i"] = round(termino_i * 10.0f) / 10.0f;
     doc_pid["termino_d"] = round(termino_d * 10.0f) / 10.0f;
-    doc_pid["modo"] = modo_operativo;
+    doc_pid["modo"] = modo_auto ? "AUTO" : "SAFE";
     doc_pid["pwm_calefactor"] = (cv_salida > 0.0f) ? round(cv_salida * 10.0f) / 10.0f : 0.0f;
     doc_pid["pwm_extractor"] = (cv_salida < 0.0f) ? round(abs(cv_salida) * 10.0f) / 10.0f : 0.0f;
     doc_pid["antiwindup_activo"] = antiwindup_activo;
@@ -345,6 +407,21 @@ void publicar_telemetria() {
 // 4. SETUP Y BUCLE PRINCIPAL (SUPERLOOP CON WDT)
 // ==============================================================================
 
+void tarea_red(void*) {
+    unsigned long last_publish = 0;
+    while (true) {
+        if (WiFi.status() == WL_CONNECTED) {
+            reconectar_mqtt();
+            mqttClient.loop();
+            if (millis() - last_publish >= PERIODO_TELEMETRIA_MS) {
+                last_publish = millis();
+                publicar_telemetria();
+            }
+        }
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+}
+
 void setup() {
     Serial.begin(115200);
     delay(500);
@@ -352,13 +429,16 @@ void setup() {
     Serial.println(F("ESP32 Control Invernadero Papa - Tesis La Paz 2026"));
     Serial.println(F("========================================================"));
 
+    // Establish inactive levels before enabling active-low relay outputs.
+    digitalWrite(PIN_RELE_HUMIDIF, HIGH);
+    digitalWrite(PIN_RELE_BOMBA, HIGH);
     // Inicialización de Pines
     pinMode(PIN_LED_ESTADO, OUTPUT);
     pinMode(PIN_SSR_CALEFACTOR, OUTPUT);
     pinMode(PIN_RELE_HUMIDIF, OUTPUT);
     pinMode(PIN_RELE_BOMBA, OUTPUT);
     pinMode(PIN_ADC_SUELO, INPUT);
-    pinMode(PIN_DIGITAL_FLOTADOR, INPUT_PULLUP);
+    pinMode(PIN_DIGITAL_FLOTADOR, INPUT); // GPIO35 requires an external pull-up.
 
     // Estados seguros iniciales (todo apagado)
     digitalWrite(PIN_SSR_CALEFACTOR, LOW);
@@ -372,8 +452,11 @@ void setup() {
 
     // Inicializar buses I2C y OneWire
     Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL);
-    sht31.begin(0x44);
+    sht31.begin();
     sensorSuelo.begin();
+    sensorSuelo.setWaitForConversion(false);
+    sensorSuelo.requestTemperatures();
+    t_conversion_suelo = millis();
     luxometro.begin(BH1750::CONTINUOUS_HIGH_RES_MODE);
 
     // Conexión WiFi
@@ -381,16 +464,20 @@ void setup() {
     Serial.println(WIFI_SSID);
     WiFi.mode(WIFI_STA);
     WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+    configTime(0, 0, "pool.ntp.org", "time.google.com");
 
     // Configuración MQTT
     mqttClient.setServer(MQTT_BROKER_IP, MQTT_PORT);
     mqttClient.setCallback(callback_mqtt);
+    mqttClient.setBufferSize(1024);
+    mqttClient.setSocketTimeout(1);
 
     // Inicialización del Hardware Watchdog Timer (WDT)
     esp_task_wdt_init(WDT_TIMEOUT_SECONDS, true); // true = reinicio de hardware ante timeout
     esp_task_wdt_add(NULL);                      // Agregar hilo principal al WDT
 
     t_inicio_ventana_ssr = millis();
+    xTaskCreatePinnedToCore(tarea_red, "mqtt", 6144, nullptr, 1, nullptr, 0);
     Serial.println(F("[✔] Inicialización completada. Iniciando lazo de control local a 10 Hz."));
 }
 
@@ -398,24 +485,13 @@ void loop() {
     // 1. Refrescar el Watchdog Timer
     esp_task_wdt_reset();
 
-    // 2. Gestión de Conectividad de Red
-    if (WiFi.status() == WL_CONNECTED) {
-        reconectar_mqtt();
-        mqttClient.loop();
-    }
-
     // 3. Ejecución Periódica de Sensores y Lazo PID (10 Hz = cada 100 ms)
     unsigned long t_actual = millis();
     if (t_actual - t_ultimo_pid >= PERIODO_PID_MS) {
+        float dt = (t_actual - t_ultimo_pid) / 1000.0f;
         t_ultimo_pid = t_actual;
         leer_sensores();
-        ejecutar_control_pid();
-    }
-
-    // 4. Publicación Periódica de Telemetría (1 Hz = cada 1000 ms)
-    if (t_actual - t_ultimo_telemetria >= PERIODO_TELEMETRIA_MS) {
-        t_ultimo_telemetria = t_actual;
-        publicar_telemetria();
+        ejecutar_control_pid(dt);
     }
 
     // 5. Heartbeat LED de Diagnóstico

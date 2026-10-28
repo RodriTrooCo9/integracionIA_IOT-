@@ -18,7 +18,7 @@ class DatabaseService:
 
     @asynccontextmanager
     async def get_connection(self):
-        conn = await aiosqlite.connect(self.db_path)
+        conn = await aiosqlite.connect(self.db_path, timeout=15)
         conn.row_factory = aiosqlite.Row
         await conn.execute("PRAGMA foreign_keys = ON;")
         try:
@@ -38,7 +38,9 @@ class DatabaseService:
         conteo_insectos: int = 1,
         severidad_porcentaje: float = 0.0,
         tiempo_inferencia_ms: float = 0.0,
-        procesado_con_sahi: bool = False
+        procesado_con_sahi: bool = False,
+        simulado: bool = True,
+        motor: str = "desconocido"
     ) -> int:
         async with self.get_connection() as conn:
             # Auto-registrar el nodo de cámara si aún no existe en nodos_sensores
@@ -54,13 +56,13 @@ class DatabaseService:
                 INSERT INTO detecciones_vision (
                     nodo_camara, tipo_origen, ruta_imagen_original, ruta_imagen_anotada,
                     clase_detectada, confianza, bbox_json, conteo_insectos,
-                    severidad_porcentaje, tiempo_inferencia_ms, procesado_con_sahi
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                    severidad_porcentaje, tiempo_inferencia_ms, procesado_con_sahi, simulado, motor
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
                 """,
                 (
                     nodo_camara, tipo_origen, ruta_original, ruta_anotada,
                     clase_detectada, confianza, bbox_json, conteo_insectos,
-                    severidad_porcentaje, tiempo_inferencia_ms, int(procesado_con_sahi)
+                    severidad_porcentaje, tiempo_inferencia_ms, int(procesado_con_sahi), int(simulado), motor
                 )
             )
             await conn.commit()
@@ -94,7 +96,7 @@ class DatabaseService:
     async def registrar_auditoria_setpoint(
         self,
         variable_control: str,
-        sp_anterior: float,
+        sp_anterior: Optional[float],
         sp_nuevo: float,
         usuario_origen: str = "SISTEMA_IA",
         kp: Optional[float] = None,
@@ -118,13 +120,27 @@ class DatabaseService:
             await conn.commit()
             return cursor.lastrowid
 
+    async def obtener_control_publicado(self, variable):
+        async with self.get_connection() as conn:
+            cursor = await conn.execute("SELECT valor FROM control_publicado WHERE variable=?", (variable,))
+            row = await cursor.fetchone()
+            return row[0] if row else None
+
+    async def guardar_control_publicado(self, variables):
+        async with self.get_connection() as conn:
+            for variable, value in variables.items():
+                await conn.execute("""INSERT INTO control_publicado(variable,valor) VALUES (?,?)
+                    ON CONFLICT(variable) DO UPDATE SET valor=excluded.valor,timestamp=CURRENT_TIMESTAMP""",
+                    (variable, value))
+            await conn.commit()
+
     async def obtener_ultimas_detecciones(self, limit: int = 20) -> List[Dict[str, Any]]:
         async with self.get_connection() as conn:
             async with conn.execute(
                 """
                 SELECT id, timestamp, nodo_camara, tipo_origen, clase_detectada,
                        confianza, conteo_insectos, severidad_porcentaje,
-                       tiempo_inferencia_ms, procesado_con_sahi
+                       tiempo_inferencia_ms, procesado_con_sahi, simulado, motor
                 FROM detecciones_vision
                 ORDER BY timestamp DESC
                 LIMIT ?;

@@ -7,10 +7,10 @@ datasources:
     url: http://influxdb:8086
     jsonData:
       version: Flux
-      organization: agri_iot_tesis
-      defaultBucket: invernadero_data
+      organization: $INFLUXDB_ORG
+      defaultBucket: $INFLUXDB_BUCKET
       tlsSkipVerify: true
     secureJsonData:
-      token: my-super-secret-admin-auth-token-tesis-2026-lapaz-bolivia
+      token: $INFLUXDB_TOKEN
     isDefault: true
     editable: true

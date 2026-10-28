@@ -7,19 +7,13 @@ import time
 import math
 import json
 import logging
+import threading
+import copy
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, Tuple
 
 logger = logging.getLogger("django_services")
-
-# Intentar importar cliente MQTT del servidor
-try:
-    from server.app.services.mqtt_client import mqtt_service
-    from server.app.core.config import settings as server_settings
-    MQTT_DISPONIBLE = True
-except Exception:
-    MQTT_DISPONIBLE = False
 
 # Estado en memoria para el Gemelo Digital y Modo Demostración
 ESTADO_GEMELO_DIGITAL = {
@@ -54,7 +48,7 @@ def calcular_psicrometria(temp_c: float, hum_pct: float) -> Tuple[float, float]:
     t_dew = (237.3 * alpha) / (17.27 - alpha)
     return round(vpd, 3), round(t_dew, 2)
 
-def actualizar_gemelo_digital(dt: float = 1.0) -> Dict[str, Any]:
+def _paso_gemelo_digital(dt: float = 1.0) -> Dict[str, Any]:
     """
     Ejecuta un paso de simulación del gemelo digital acoplado FOPDT
     según el modo de perturbación seleccionado.
@@ -68,21 +62,30 @@ def actualizar_gemelo_digital(dt: float = 1.0) -> Dict[str, Any]:
         st["rad_solar"] = 0.0
     elif modo == "TEMPORAL_NIEBLA":
         st["temp_exterior"] = 11.0
-        st["hum_interior"] = min(98.0, st["hum_interior"] + 1.2)
+        st["hum_interior"] = min(98.0, st["hum_interior"] + 1.2 * dt)
         st["rad_solar"] = 80.0
     elif modo == "OLA_CALOR":
         st["temp_exterior"] = 23.0
         st["rad_solar"] = 820.0
     elif modo == "PLAGA_PULGON":
         st["temp_exterior"] = 18.0
-        st["hum_interior"] = max(45.0, st["hum_interior"] - 0.8)
+        st["hum_interior"] = max(45.0, st["hum_interior"] - 0.8 * dt)
     else: # NORMAL
         st["temp_exterior"] = 10.5 + 4.5 * math.sin(time.time() / 60.0)
         st["rad_solar"] = max(0.0, 550.0 * math.sin(time.time() / 120.0))
 
     # 2. Dinámica PID y control térmico
     error = st["sp_temperatura"] - st["temp_interior"]
-    cv = (st["kp"] * error) + 10.0 # Aproximación proporcional-integral
+    previous_pv = st.get('_pv_previous', st['temp_interior'])
+    integral = st.get('_integral', 0.0)
+    derivative = -st['kd'] * (st['temp_interior'] - previous_pv) / dt
+    trial = integral + st['ki'] * error * dt
+    tentative = st['kp'] * error + trial + derivative
+    if -100 <= tentative <= 100 or (tentative > 100 and error < 0) or (tentative < -100 and error > 0):
+        integral = max(-100, min(100, trial))
+    st['_integral'] = integral
+    st['_pv_previous'] = st['temp_interior']
+    cv = st['kp'] * error + integral + derivative
     cv = max(-100.0, min(100.0, cv))
     
     if cv >= 0:
@@ -93,16 +96,16 @@ def actualizar_gemelo_digital(dt: float = 1.0) -> Dict[str, Any]:
         st["extractor_pct"] = round(abs(cv), 1)
 
     # Inercia térmica FOPDT (K=0.1639, tau=240s)
-    delta_t = (-(st["temp_interior"] - st["temp_exterior"]) + (0.1639 * st["calefactor_pct"]) - (0.12 * st["extractor_pct"]) + (st["rad_solar"] * 0.006)) / 30.0
+    delta_t = (-(st["temp_interior"] - st["temp_exterior"]) + (0.1639 * st["calefactor_pct"]) - (0.12 * st["extractor_pct"]) + (st["rad_solar"] * 0.006)) / 242.96
     st["temp_interior"] = round(st["temp_interior"] + delta_t * dt, 2)
     
     # Dinámica de humedad
     if st["extractor_pct"] > 0:
-        st["hum_interior"] = max(40.0, st["hum_interior"] - (st["extractor_pct"] * 0.08))
+        st["hum_interior"] = max(40.0, st["hum_interior"] - (st["extractor_pct"] * 0.08 * dt))
     elif st["calefactor_pct"] > 50:
-        st["hum_interior"] = max(45.0, st["hum_interior"] - 0.05)
+        st["hum_interior"] = max(45.0, st["hum_interior"] - 0.05 * dt)
     else:
-        st["hum_interior"] = min(96.0, st["hum_interior"] + 0.02)
+        st["hum_interior"] = min(96.0, st["hum_interior"] + 0.02 * dt)
     st["hum_interior"] = round(st["hum_interior"], 1)
 
     # 3. Psicrometría y Fusión de Riesgo
@@ -131,6 +134,33 @@ def actualizar_gemelo_digital(dt: float = 1.0) -> Dict[str, Any]:
     st["ultima_actualizacion"] = time.time()
     
     return st
+
+_gemelo_lock = threading.Lock()
+_gemelo_last_step = time.monotonic()
+
+
+def actualizar_gemelo_digital() -> Dict[str, Any]:
+    """Advance by elapsed monotonic seconds, independent of visitor count.
+
+    This is an explicitly labelled per-process demonstration, not live telemetry.
+    """
+    global _gemelo_last_step
+    with _gemelo_lock:
+        now = time.monotonic()
+        elapsed = now - _gemelo_last_step
+        # Integrate fixed one-second steps; repeated requests do not advance time.
+        steps = min(int(elapsed), 300)
+        for _ in range(steps):
+            _paso_gemelo_digital(1.0)
+        if steps:
+            _gemelo_last_step += steps
+            if elapsed > 300:
+                _gemelo_last_step = now
+        st = ESTADO_GEMELO_DIGITAL
+        st['vpd_kpa'], st['punto_rocio'] = calcular_psicrometria(st['temp_interior'], st['hum_interior'])
+        result = {k: copy.deepcopy(v) for k, v in st.items() if not k.startswith('_')}
+        result['fuente'] = 'simulacion_local_por_proceso'
+        return result
 
 def ejecutar_autotune_pid(metodo: str = "OPTUNA") -> Dict[str, Any]:
     """
@@ -244,5 +274,6 @@ def obtener_explicacion_riesgo_shap(score_riesgo: float, hum_interior: float, vp
         "score_riesgo": score_riesgo,
         "nivel": nivel,
         "recomendacion_accion": recomendaciones[nivel],
-        "factores_shap": factores
+        "factores_shap": factores,
+        "metodo": "reglas_demostrativas_no_shap"
     }

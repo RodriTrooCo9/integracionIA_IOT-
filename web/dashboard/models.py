@@ -37,6 +37,8 @@ class DeteccionVision(models.Model):
     severidad_porcentaje = models.FloatField(default=0.0, verbose_name="Severidad Foliar (%)")
     tiempo_inferencia_ms = models.FloatField(blank=True, null=True, verbose_name="Tiempo de Inferencia (ms)")
     procesado_con_sahi = models.BooleanField(default=False, verbose_name="Procesado con SAHI")
+    simulado = models.BooleanField(default=True)
+    motor = models.CharField(max_length=32, default="desconocido")
 
     class Meta:
         db_table = 'detecciones_vision'
@@ -71,7 +73,7 @@ class AuditoriaControlPID(models.Model):
     timestamp = models.DateTimeField(auto_now_add=True, verbose_name="Fecha / Hora")
     usuario_origen = models.CharField(max_length=32, default='SISTEMA_IA', verbose_name="Origen del Cambio")
     variable_control = models.CharField(max_length=32, verbose_name="Variable Controlada")
-    sp_anterior = models.FloatField(verbose_name="Setpoint Anterior")
+    sp_anterior = models.FloatField(null=True, blank=True, verbose_name="Setpoint Anterior")
     sp_nuevo = models.FloatField(verbose_name="Setpoint Nuevo")
     kp = models.FloatField(blank=True, null=True, verbose_name="Kp")
     ki = models.FloatField(blank=True, null=True, verbose_name="Ki")

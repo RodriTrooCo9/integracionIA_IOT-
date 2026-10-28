@@ -70,8 +70,8 @@ services:
       - INFLUXDB_TOKEN=${INFLUXDB_TOKEN:-my-super-secret-admin-auth-token-tesis-2026-lapaz-bolivia}
       - INFLUXDB_ORG=${INFLUXDB_ORG:-agri_iot_tesis}
       - INFLUXDB_BUCKET=${INFLUXDB_BUCKET:-invernadero_data}
-      - MQTT_USERNAME=${MQTT_USERNAME:-telegraf_worker}
-      - MQTT_PASSWORD=${MQTT_PASSWORD:-TelegrafWorkerPass2026!}
+      - MQTT_USERNAME=${TELEGRAF_MQTT_USERNAME:-telegraf_worker}
+      - MQTT_PASSWORD=${TELEGRAF_MQTT_PASSWORD:-TesisPapaLaPaz2026!}
     volumes:
       - ./config/telegraf/telegraf.conf:/etc/telegraf/telegraf.conf:ro
     networks:
@@ -93,6 +93,9 @@ services:
       - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin_tesis_grafana}
       - GF_USERS_ALLOW_SIGN_UP=false
+      - INFLUXDB_TOKEN=${INFLUXDB_TOKEN:-my-super-secret-admin-auth-token-tesis-2026-lapaz-bolivia}
+      - INFLUXDB_ORG=${INFLUXDB_ORG:-agri_iot_tesis}
+      - INFLUXDB_BUCKET=${INFLUXDB_BUCKET:-invernadero_data}
     volumes:
       - grafana_data:/var/lib/grafana
       - ./config/grafana/provisioning:/etc/grafana/provisioning:ro
@@ -118,8 +121,10 @@ services:
     environment:
       - MQTT_BROKER_HOST=mosquitto
       - MQTT_BROKER_PORT=1883
-      - MQTT_USERNAME=fastapi_server
-      - MQTT_PASSWORD=FastApiSecretPass2026!
+      - MQTT_USERNAME=${BACKEND_MQTT_USERNAME:-fastapi_server}
+      - MQTT_PASSWORD=${BACKEND_MQTT_PASSWORD:-FastApiSecretPass2026!}
+      - API_KEY=${API_KEY:-}
+      - VISION_DEMO_MODE=${VISION_DEMO_MODE:-false}
       - SQLITE_DB_PATH=/workspace/data/invernadero_relacional.db
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
       - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-}
@@ -152,8 +157,10 @@ services:
     environment:
       - MQTT_BROKER_HOST=mosquitto
       - MQTT_BROKER_PORT=1883
-      - MQTT_USERNAME=fastapi_server
-      - MQTT_PASSWORD=FastApiSecretPass2026!
+      - MQTT_USERNAME=${BACKEND_MQTT_USERNAME:-fastapi_server}
+      - MQTT_PASSWORD=${BACKEND_MQTT_PASSWORD:-FastApiSecretPass2026!}
+      - API_KEY=${API_KEY:-}
+      - VISION_DEMO_MODE=${VISION_DEMO_MODE:-false}
       - SQLITE_DB_PATH=/workspace/data/invernadero_relacional.db
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
       - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-}

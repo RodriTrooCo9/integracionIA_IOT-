@@ -52,12 +52,16 @@
 #define WIFI_PASSWORD         "TesisPapa2026!"
 #define MQTT_BROKER_IP        "192.168.1.100"  // IP de la laptop/servidor en la red local
 #define MQTT_PORT             1883
+#define MQTT_USERNAME         "esp32_nodo"
+#define MQTT_PASSWORD         "Esp32MicroclimaPass2026!"
+#define TOPIC_CONTROL_ESTADO   "invernadero/control/estado"
+#define PIN_FLOTADOR_AGUA_OK   LOW  // Contacto cerrado a GND cuando hay agua
 #define MQTT_CLIENT_ID        "esp32_invernadero_nodo01"
 
 // Tópicos MQTT según especificación Fase 0
 #define TOPIC_TELEMETRIA_CLIMA "invernadero/telemetria/microclima"
 #define TOPIC_TELEMETRIA_PID   "invernadero/telemetria/pid"
-#define TOPIC_CONTROL_SP       "invernadero/control/setpoint"
+#define TOPIC_CONTROL_SP       "invernadero/control/setpoints"
 #define TOPIC_CONTROL_GANANCIAS "invernadero/control/ganancias"
 #define TOPIC_CONTROL_MODO     "invernadero/control/modo"
 #define TOPIC_ALERTA           "invernadero/alerta"

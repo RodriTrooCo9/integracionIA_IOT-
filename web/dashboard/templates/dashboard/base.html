@@ -78,6 +78,10 @@
         </div>
     </header>
 
+    <div class="text-center text-sm py-2 bg-amber-950 text-amber-200">
+        Panel de demostración: las gráficas muestran un gemelo simulado.
+        {% if not request.user.is_authenticated %}<a href="/accounts/login/" class="underline">Iniciar sesión de operador</a>{% endif %}
+    </div>
     <!-- Contenido Principal -->
     <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {% block content %}{% endblock %}
@@ -96,6 +100,20 @@
         }
         setInterval(actualizarReloj, 1000);
         actualizarReloj();
+    </script>
+    <script>
+        const originalFetch = window.fetch.bind(window);
+        window.fetch = (input, options = {}) => {
+            const url = new URL(typeof input === 'string' ? input : input.url, location.href);
+            const method = (options.method || (input && input.method) || 'GET').toUpperCase();
+            if (url.origin === location.origin && !['GET', 'HEAD', 'OPTIONS'].includes(method)) {
+                const csrf = document.cookie.split('; ').find(v => v.startsWith('csrftoken='));
+                const headers = new Headers(options.headers || (input && input.headers));
+                if (csrf) headers.set('X-CSRFToken', decodeURIComponent(csrf.split('=')[1]));
+                options = {...options, headers};
+            }
+            return originalFetch(input, options);
+        };
     </script>
     {% block scripts %}{% endblock %}
 </body>

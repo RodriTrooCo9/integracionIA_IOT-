@@ -21,7 +21,11 @@ from dashboard.models import AuditoriaControlPID, ExperimentoEnsayo, DeteccionVi
 
 @pytest.fixture
 def client():
-    return Client()
+    from django.contrib.auth import get_user_model
+    user, _ = get_user_model().objects.get_or_create(username='test-operator', defaults={'is_staff': True})
+    client = Client()
+    client.force_login(user)
+    return client
 
 def test_django_index_view(client):
     """Verifica que la página principal cargue correctamente con código 200."""
@@ -99,7 +103,7 @@ def test_api_actualizar_setpoints(client):
     )
     assert response.status_code == 200
     data = response.json()
-    assert data["status"] == "success"
+    assert data["status"] == "published"
     assert data["sp_temperatura"] == 19.5
     assert data["sp_humedad"] == 72.0
 
@@ -118,7 +122,7 @@ def test_api_actualizar_pid(client):
     )
     assert response.status_code == 200
     data = response.json()
-    assert data["status"] == "success"
+    assert data["status"] == "published"
     assert data["kp"] == 16.5
 
 def test_api_autotune(client):

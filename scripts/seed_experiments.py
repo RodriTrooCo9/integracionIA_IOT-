@@ -4,10 +4,14 @@ Tesis: Sistema Integrado IoT-PID-IA en Invernadero de Papa (La Paz, Bolivia).
 """
 
 import sqlite3
+import sys
 import json
 from pathlib import Path
 
-DB_PATH = Path(__file__).resolve().parent.parent / "data" / "invernadero_relacional.db"
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from server.app.core.config import settings
+from server.app.services.bootstrap import inicializar_db
+DB_PATH = Path(settings.SQLITE_DB_PATH)
 
 ENSAYOS = [
     ('E1', 'Validación Metrológica de Sensores y Repetibilidad', 'Sensor SHT31 vs BME280 a 3600 msnm', '2026-03-01 08:00:00', '2026-03-03 18:00:00', 58.0, 
@@ -50,13 +54,27 @@ def poblar_ensayos():
     
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    c.executemany('''
-        INSERT OR REPLACE INTO experimentos_ensayos 
-        (codigo_experimento, nombre_ensayo, tratamiento, fecha_inicio, fecha_fin, duracion_horas, observaciones, metricas_resumen_json)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    ''', ENSAYOS)
+    inicializar_db(DB_PATH)
+    c.execute("BEGIN IMMEDIATE")
+    for ensayo in ENSAYOS:
+        key = f"demo:{ensayo[0]}"
+        if c.execute("SELECT 1 FROM seed_fixtures WHERE fixture_key=?", (key,)).fetchone():
+            continue
+        # Adopt an existing matching fixture without deleting or overwriting trials.
+        row = c.execute("""SELECT id FROM experimentos_ensayos
+            WHERE codigo_experimento=? AND nombre_ensayo=? AND tratamiento=? AND fecha_inicio=?
+            ORDER BY id LIMIT 1""", ensayo[:4]).fetchone()
+        if row:
+            row_id = row[0]
+        else:
+            c.execute("""INSERT INTO experimentos_ensayos
+                (codigo_experimento,nombre_ensayo,tratamiento,fecha_inicio,fecha_fin,
+                 duracion_horas,observaciones,metricas_resumen_json)
+                VALUES (?,?,?,?,?,?,?,?)""", ensayo)
+            row_id = c.lastrowid
+        c.execute("INSERT INTO seed_fixtures VALUES (?,?)", (key, row_id))
     conn.commit()
-    print(f"✅ Se han registrado {c.rowcount} ensayos experimentales en SQLite.")
+    print("Ensayos demostrativos E1–E8 disponibles (carga idempotente).")
     conn.close()
     return True
 

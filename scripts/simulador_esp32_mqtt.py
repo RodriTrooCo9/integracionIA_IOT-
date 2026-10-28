@@ -10,13 +10,16 @@ import math
 import json
 import random
 import os
+from pathlib import Path
+from dotenv import load_dotenv
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 import paho.mqtt.client as mqtt
 
 # Parámetros del Broker MQTT
 MQTT_BROKER = os.getenv("MQTT_BROKER_HOST", "localhost")
 MQTT_PORT = int(os.getenv("MQTT_BROKER_PORT", 1883))
-MQTT_USER = os.getenv("MQTT_USERNAME", "esp32_nodo")
-MQTT_PASS = os.getenv("MQTT_PASSWORD", "Esp32MicroclimaPass2026!")
+MQTT_USER = os.getenv("ESP32_MQTT_USERNAME", "esp32_nodo")
+MQTT_PASS = os.getenv("ESP32_MQTT_PASSWORD", "Esp32MicroclimaPass2026!")
 CLIENT_ID = "simulador_esp32_la_paz"
 
 # Tópicos
@@ -58,7 +61,7 @@ def calcular_punto_rocio(temp, hum):
     alpha = ((a * temp) / (b + temp)) + math.log(max(hum, 1.0) / 100.0)
     return round((b * alpha) / (a - alpha), 2)
 
-def on_connect(client, userdata, flags, rc):
+def on_connect(client, userdata, flags, rc, properties=None):
     if rc == 0:
         print(f"[✔] Conectado exitosamente al broker MQTT en {MQTT_BROKER}:{MQTT_PORT}")
         client.subscribe(TOPIC_CONTROL_SP)
@@ -71,6 +74,8 @@ def on_message(client, userdata, msg):
     global setpoint_temp, modo_operativo
     try:
         payload = json.loads(msg.payload.decode("utf-8"))
+        if payload.get("expires_at", 0) < time.time():
+            return
         if msg.topic == TOPIC_CONTROL_SP:
             val_sp = payload.get("sp_temperatura", payload.get("sp_temp", None))
             if val_sp is not None:
@@ -118,8 +123,10 @@ def main():
             error = setpoint_temp - temperatura_actual
             
             # Anti-windup condicional
-            if -100.0 <= error_acumulado <= 100.0:
-                error_acumulado += error * dt
+            tentative_integral = error_acumulado + error * dt
+            tentative_output = kp * error + ki * tentative_integral
+            if -100 <= tentative_output <= 100 or (tentative_output > 100 and error < 0) or (tentative_output < -100 and error > 0):
+                error_acumulado = max(-100 / ki, min(100 / ki, tentative_integral))
             
             derivada = (error - error_previo) / dt
             p_term = kp * error
@@ -130,6 +137,10 @@ def main():
             cv_salida = max(-100.0, min(100.0, cv_salida))  # Saturación [-100, 100]
             error_previo = error
             
+            if modo_operativo != "AUTO":
+                cv_salida = 0.0
+                error_acumulado = 0.0
+
             # Split-range de actuadores
             pwm_calefactor = max(0.0, cv_salida)
             pwm_extractor = abs(min(0.0, cv_salida))
@@ -153,6 +164,7 @@ def main():
             payload_clima = {
                 "nodo_id": "esp32_invernadero_01",
                 "zona": "zona_a_central",
+                "timestamp": time.time(),
                 "timestamp_ms": ts_ms,
                 "temp_aire": round(temperatura_actual, 2),
                 "hum_aire": round(humedad_actual, 2),
@@ -169,6 +181,7 @@ def main():
             # 4. Empaquetar y Publicar Telemetría PID
             payload_pid = {
                 "nodo_id": "esp32_invernadero_01",
+                "timestamp": time.time(),
                 "timestamp_ms": ts_ms,
                 "variable": "TEMPERATURA",
                 "sp_temp": round(setpoint_temp, 2),

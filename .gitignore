@@ -103,3 +103,5 @@ fases/
 # Respaldos comprimidos del sistema
 backups/
 *.tar.gz
+
+thesis/capitulos/*.

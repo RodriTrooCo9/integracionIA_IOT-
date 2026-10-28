@@ -1,0 +1,11 @@
+{% extends 'dashboard/base.html' %}
+{% block content %}
+<form method="post" class="max-w-sm mx-auto space-y-4">
+    <h1 class="text-xl">Acceso de operador</h1>
+    {% csrf_token %}
+    {{ form.as_p }}
+    <input type="hidden" name="next" value="{{ next }}">
+    <button type="submit" class="p-3 bg-emerald-700 rounded">Iniciar sesión</button>
+    <p>Se requiere una cuenta activa con permiso de personal para enviar órdenes.</p>
+</form>
+{% endblock %}

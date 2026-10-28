@@ -21,6 +21,8 @@ logger = logging.getLogger("fastapi_main")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    from server.app.services.bootstrap import inicializar_db
+    inicializar_db()
     # Inicio de ciclo de vida
     logger.info(f"Iniciando {settings.PROJECT_NAME} v{settings.VERSION}...")
     try:
@@ -45,11 +47,14 @@ app = FastAPI(
 # Habilitar CORS para integración con la aplicación web y dashboards
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=[],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+from server.app.core.security import RequestGuardMiddleware
+app.add_middleware(RequestGuardMiddleware)
 
 # Incluir rutas bajo prefijo /api/v1
 app.include_router(api_router, prefix=settings.API_V1_STR)

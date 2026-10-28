@@ -128,7 +128,7 @@
             <div class="bg-slate-900/90 rounded-xl border border-slate-800 overflow-hidden hover:border-slate-700 transition-all flex flex-col">
                 <div class="h-32 bg-slate-950 flex items-center justify-center relative overflow-hidden">
                     {% if d.ruta_imagen_anotada %}
-                    <img src="/media/{{ d.ruta_imagen_anotada|cut:'/home/rodrigo/Desktop/IOTtesis/data/raw/uploads/' }}" alt="{{ d.clase_detectada }}" class="object-cover w-full h-full">
+                    <img src="{{ d.imagen_url }}" alt="{{ d.clase_detectada }}{% if d.simulado %} (demostración){% endif %}" class="object-cover w-full h-full">
                     {% else %}
                     <div class="text-slate-600 flex flex-col items-center">
                         <i data-lucide="leaf" class="w-8 h-8 mb-1"></i>
@@ -203,6 +203,7 @@
             const data = await resp.json();
 
             if (data.status === "success") {
+                if (data.simulado) alert("Resultado de demostración; no se envía al control automático.");
                 document.getElementById('resultado-vacio').classList.add('hidden');
                 document.getElementById('resultado-datos').classList.remove('hidden');
 
@@ -215,7 +216,7 @@
                 // Extraer nombre de archivo para servirlo
                 const partes = data.ruta_anotada.split("/");
                 const filename = partes[partes.length - 1];
-                document.getElementById('res-img-anotada').src = "/media/" + filename;
+                document.getElementById('res-img-anotada').src = data.ruta_anotada;
             } else {
                 alert("Error en la inferencia: " + data.message);
             }

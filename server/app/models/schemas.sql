@@ -32,6 +32,8 @@ CREATE TABLE IF NOT EXISTS detecciones_vision (
     severidad_porcentaje REAL DEFAULT 0.0, -- Para lesiones foliares (0.0 a 100.0)
     tiempo_inferencia_ms REAL,
     procesado_con_sahi BOOLEAN DEFAULT 0,
+    simulado BOOLEAN NOT NULL DEFAULT 1,
+    motor TEXT NOT NULL DEFAULT 'desconocido',
     FOREIGN KEY (nodo_camara) REFERENCES nodos_sensores(nodo_id)
 );
 
@@ -53,7 +55,7 @@ CREATE TABLE IF NOT EXISTS auditoria_control_pid (
     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     usuario_origen VARCHAR(32) DEFAULT 'SISTEMA_IA', -- 'SISTEMA_IA', 'OPERADOR_WEB', 'VALOR_DEFECTO'
     variable_control VARCHAR(32) NOT NULL, -- 'TEMPERATURA', 'HUMEDAD'
-    sp_anterior REAL NOT NULL,
+    sp_anterior REAL,
     sp_nuevo REAL NOT NULL,
     kp REAL,
     ki REAL,
@@ -79,3 +81,14 @@ CREATE INDEX IF NOT EXISTS idx_detecciones_fecha ON detecciones_vision(timestamp
 CREATE INDEX IF NOT EXISTS idx_detecciones_clase ON detecciones_vision(clase_detectada);
 CREATE INDEX IF NOT EXISTS idx_eventos_nivel ON eventos_alarmas(nivel_severidad, timestamp);
 CREATE INDEX IF NOT EXISTS idx_experimentos_codigo ON experimentos_ensayos(codigo_experimento);
+
+-- One record per logical demonstration fixture. Existing real trials are untouched.
+CREATE TABLE IF NOT EXISTS seed_fixtures (
+    fixture_key TEXT PRIMARY KEY,
+    experimento_id INTEGER NOT NULL REFERENCES experimentos_ensayos(id)
+);
+CREATE TABLE IF NOT EXISTS control_publicado (
+    variable TEXT PRIMARY KEY,
+    valor REAL NOT NULL,
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);

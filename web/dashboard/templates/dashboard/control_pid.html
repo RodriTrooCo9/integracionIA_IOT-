@@ -251,8 +251,8 @@
                 body: JSON.stringify({ sp_temperatura: sp_temp, sp_humedad: sp_hum, justificacion: justificacion })
             });
             const data = await resp.json();
-            if (data.status === "success") {
-                alert("✅ Setpoints guardados con éxito: " + data.mensaje);
+            if (data.status === "published") {
+                alert("Orden publicada al broker. Aplicación en el nodo pendiente de confirmación.");
                 location.reload();
             } else {
                 alert("❌ Error al guardar setpoints: " + data.message);
@@ -274,8 +274,8 @@
                 body: JSON.stringify({ kp: kp, ki: ki, kd: kd })
             });
             const data = await resp.json();
-            if (data.status === "success") {
-                alert("✅ Ganancias PID aplicadas: " + data.mensaje);
+            if (data.status === "published") {
+                alert("Ganancias publicadas al broker. Aplicación en el nodo pendiente de confirmación.");
                 location.reload();
             } else {
                 alert("❌ Error: " + data.message);
