@@ -1,0 +1,3 @@
+# Acquisition and preparation only; Ultralytics is installed in the training notebook.
+Pillow>=10.3,<13
+PyYAML>=6,<7
