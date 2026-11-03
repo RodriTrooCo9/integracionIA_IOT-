@@ -52,7 +52,20 @@ def test_actualizar_setpoints_invalido():
     response = client.post("/api/v1/control/setpoints", json=payload)
     assert response.status_code == 422 # Error de validación Pydantic
 
-def test_inferencia_vision_endpoint():
+def test_inferencia_vision_endpoint(monkeypatch):
+    # Unit fixture, not a claim of prediction from pretrained COCO weights.
+    from server.app.services.vision_service import vision_service
+
+    def fixture_result(ruta_imagen, **kwargs):
+        return {"clase_detectada": "hoja_sana", "confianza": 0.8,
+                "conteo_insectos": 0, "severidad_porcentaje": 0.0,
+                "bbox_json": "[]", "tiempo_inferencia_ms": 1.0,
+                "procesado_con_sahi": False, "simulado": False,
+                "tarea_modelo": "classify", "apto_supervision": False,
+                "severidad_disponible": False, "conteo_disponible": False,
+                "ruta_imagen_original": ruta_imagen, "ruta_imagen_anotada": ruta_imagen}
+
+    monkeypatch.setattr(vision_service, "procesar_imagen", fixture_result)
     # Crear imagen sintética en memoria (100x100 RGB)
     img_array = np.zeros((100, 100, 3), dtype=np.uint8)
     img_array[:] = (34, 139, 34) # Color verde hoja

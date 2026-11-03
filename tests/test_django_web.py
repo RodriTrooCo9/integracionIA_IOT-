@@ -41,11 +41,12 @@ def test_django_control_pid_view(client):
     assert "Cohen-Coon" in contenido or "Optuna" in contenido
 
 def test_django_vision_view(client):
-    """Verifica vista de visión artificial YOLO11n."""
+    """Verifica vista de visión artificial YOLO26 y compatibilidad YOLO11."""
     response = client.get("/vision/")
     assert response.status_code == 200
     contenido = response.content.decode("utf-8")
-    assert "YOLO11n" in contenido
+    assert "YOLO26" in contenido
+    assert "YOLO11" in contenido
     assert "SAHI" in contenido
 
 def test_django_gemelo_digital_view(client):

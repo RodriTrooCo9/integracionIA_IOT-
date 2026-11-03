@@ -5,6 +5,7 @@ Proyecto de Tesis - Invernadero de Papa (La Paz, Bolivia)
 
 import os
 from pathlib import Path
+from typing import Literal
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent
@@ -38,7 +39,9 @@ class Settings(BaseSettings):
     TELEGRAM_CHAT_ID: str = os.getenv("TELEGRAM_CHAT_ID", "")
     
     # Visión Artificial
-    MODEL_WEIGHTS_PATH: str = str(BASE_DIR / "data" / "models" / "yolo11n_papa.pt")
+    MODEL_WEIGHTS_PATH: str = str(BASE_DIR / "data" / "models" / "yolo26n_papa.pt")
+    VISION_DEMO_MODE: bool = False
+    VISION_BOX_SEMANTICS: Literal["unknown", "whole_leaf", "lesion", "none"] = "unknown"
     UPLOAD_DIR: str = str(BASE_DIR / "data" / "raw" / "uploads")
     
     # InfluxDB v2

@@ -8,6 +8,7 @@ import json
 import time
 from datetime import datetime
 from pathlib import Path
+from uuid import uuid4
 
 from django.shortcuts import render
 from django.http import JsonResponse, HttpResponse
@@ -22,7 +23,7 @@ from .services import (
 
 # Intentar importar servicios del servidor backend
 try:
-    from server.app.services.vision_service import vision_service
+    from server.app.services.vision_service import vision_service, VisionUnavailable
     from server.app.services.mqtt_client import mqtt_service
     from server.app.core.config import settings as server_settings
     BACKEND_DISPONIBLE = True
@@ -64,7 +65,7 @@ def vision_view(request):
     detecciones = DeteccionVision.objects.order_by('-timestamp')[:24]
     context = {
         "detecciones": detecciones,
-        "titulo": "Visor de Patologías y Plagas (YOLO11n + SAHI)"
+        "titulo": "Visor de Patologías y Plagas (YOLO26 / YOLO11 + SAHI)"
     }
     return render(request, "dashboard/vision.html", context)
 
@@ -217,31 +218,18 @@ def api_subir_imagen_vision(request):
     tipo_origen = request.POST.get("tipo_origen", "HOJA_FOLLAJE")
     usar_sahi = request.POST.get("usar_sahi", "false").lower() == "true"
 
-    # Guardar archivo
-    upload_path = Path("/home/rodrigo/Desktop/IOTtesis/data/raw/uploads")
-    upload_path.mkdir(parents=True, exist_ok=True)
-    nombre_guardado = f"{int(time.time())}_{archivo.name.replace(' ', '_')}"
-    ruta_completa = upload_path / nombre_guardado
-
-    with open(ruta_completa, "wb+") as f:
-        for chunk in archivo.chunks():
-            f.write(chunk)
-
-    # Inferencia
-    if BACKEND_DISPONIBLE:
+    if not BACKEND_DISPONIBLE:
+        return JsonResponse({"status": "error", "message": "Backend de visión no disponible"}, status=503)
+    nombre_guardado = default_storage.save(f"{uuid4().hex}{Path(archivo.name).suffix.lower()}", archivo)
+    ruta_completa = Path(default_storage.path(nombre_guardado))
+    try:
         res = vision_service.procesar_imagen(str(ruta_completa), tipo_origen=tipo_origen, usar_sahi=usar_sahi)
-    else:
-        res = {
-            "clase_detectada": "tizon_tardio" if tipo_origen == "HOJA_FOLLAJE" else "pulgon",
-            "confianza": 0.89,
-            "conteo_insectos": 8 if tipo_origen == "TRAMPA_AMARILLA" else 1,
-            "severidad_porcentaje": 14.5 if tipo_origen == "HOJA_FOLLAJE" else 0.0,
-            "tiempo_inferencia_ms": 38.5,
-            "procesado_con_sahi": usar_sahi,
-            "bbox_json": json.dumps([{"clase": "muestra", "confianza": 0.89, "bbox": [20, 20, 80, 80]}]),
-            "ruta_imagen_original": str(ruta_completa),
-            "ruta_imagen_anotada": str(ruta_completa)
-        }
+    except VisionUnavailable as exc:
+        default_storage.delete(nombre_guardado)
+        return JsonResponse({"status": "error", "message": str(exc)}, status=503)
+    except ValueError as exc:
+        default_storage.delete(nombre_guardado)
+        return JsonResponse({"status": "error", "message": str(exc)}, status=400)
 
     # Registrar en base de datos
     cam_nodo, _ = NodoSensor.objects.get_or_create(
@@ -271,7 +259,11 @@ def api_subir_imagen_vision(request):
         "conteo_insectos": res["conteo_insectos"],
         "severidad_porcentaje": res["severidad_porcentaje"],
         "tiempo_ms": res["tiempo_inferencia_ms"],
-        "ruta_anotada": res.get("ruta_imagen_anotada", "")
+        "ruta_anotada": res.get("ruta_imagen_anotada", ""),
+        "severidad_disponible": res["severidad_disponible"],
+        "conteo_disponible": res["conteo_disponible"],
+        "tarea_modelo": res["tarea_modelo"],
+        "simulado": res["simulado"],
     })
 
 def exportar_experimentos_csv(request):

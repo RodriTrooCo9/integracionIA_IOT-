@@ -128,6 +128,10 @@ def actualizar_gemelo_digital(dt: float = 1.0) -> Dict[str, Any]:
     st["nivel_riesgo"] = nivel
     st["vpd_kpa"] = vpd
     st["punto_rocio"] = t_dew
+    st["hum_exterior"] = round(95.0 if modo == "TEMPORAL_NIEBLA" else (40.0 if modo == "OLA_CALOR" else 65.0), 1)
+    st["actuador_calefactor_ssr"] = st["calefactor_pct"]
+    st["actuador_extractor"] = st["extractor_pct"]
+    st["actuador_bomba_humedad"] = 100.0 if st.get("bomba_riego") else 0.0
     st["ultima_actualizacion"] = time.time()
     
     return st

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 crear_notebook_fase2.py
-Construye el notebook notebooks/01_identificacion_pid_fopdt.ipynb
+Construye el notebook notebooks/control/01_identificacion_pid_fopdt.ipynb
 con formato estándar nbformat v4 para Google Colab y VSCode.
 """
 
@@ -9,7 +9,7 @@ import json
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-NOTEBOOK_PATH = BASE_DIR / "notebooks" / "01_identificacion_pid_fopdt.ipynb"
+NOTEBOOK_PATH = BASE_DIR / "notebooks" / "control" / "01_identificacion_pid_fopdt.ipynb"
 
 cells = [
     {
@@ -61,7 +61,7 @@ cells = [
             "plt.rcParams['axes.grid'] = True\n",
             "plt.rcParams['grid.linestyle'] = ':'\n",
             "plt.rcParams['grid.alpha'] = 0.6\n",
-            "print(\"[✔] Entorno inicializado y librerías importadas con éxito.\")"
+            "print(\"[OK] Entorno inicializado y librerías importadas con éxito.\")"
         ]
     },
     {
@@ -85,7 +85,7 @@ cells = [
             "    from google.colab import drive\n",
             "    drive.mount('/content/drive')\n",
             "    RUTA_BASE = '/content/drive/MyDrive/Tesis_IOT_Papa'\n",
-            "    print(\"[✔] Google Drive montado en /content/drive\")\n",
+            "    print(\"[OK] Google Drive montado en /content/drive\")\n",
             "except Exception:\n",
             "    RUTA_BASE = '.'\n",
             "    print(\"[i] Ejecutando en entorno local o sin Google Drive montado.\")"
@@ -132,7 +132,7 @@ cells = [
             "u_exp = df['control_u_pct'].values\n",
             "y_exp = df['temperatura_medida_c'].values\n",
             "\n",
-            "print(f\"[✔] Datos cargados: {len(df)} muestras | Duración: {t_exp[-1]/60:.1f} minutos\")\n",
+            "print(f\"[OK] Datos cargados: {len(df)} muestras | Duración: {t_exp[-1]/60:.1f} minutos\")\n",
             "print(df.head())"
         ]
     },
@@ -216,7 +216,7 @@ cells = [
             "plt.figure(figsize=(9, 4.8), dpi=300)\n",
             "plt.plot(t_exp / 60.0, y_exp, color='#4A5568', alpha=0.6, label='Sensor SHT31 (Datos Experimentales)', linewidth=1.2)\n",
             "plt.plot(t_exp / 60.0, y_pred, color='#E53E3E', linewidth=2.0, label=f'Modelo FOPDT ($R^2 = {r2:.4f}$)')\n",
-            "plt.axvline(t_step / 60.0, color='#3182CE', linestyle='--', alpha=0.8, label=f'Escalón de Potencia ($u = {delta_u}\\%$)')\n",
+            "plt.axvline(t_step / 60.0, color='#3182CE', linestyle='--', alpha=0.8, label=rf'Escalón de Potencia ($u = {delta_u}\\%$)')\n",
             "plt.title('Identificación Paramétrica FOPDT - Curva de Reacción Térmica (Invernadero La Paz)', fontweight='bold')\n",
             "plt.xlabel('Tiempo [minutos]')\n",
             "plt.ylabel('Temperatura del Aire [°C]')\n",
@@ -391,7 +391,7 @@ cells = [
             "estudio.optimize(objetivo_optuna, n_trials=80)\n",
             "\n",
             "best_p = estudio.best_params\n",
-            "print(\"[✔] Optimización completada con éxito.\")\n",
+            "print(\"[OK] Optimización completada con éxito.\")\n",
             "print(f\"Mejores Ganancias -> Kp: {best_p['Kp']:.3f}, Ki: {best_p['Ki']:.5f}, Kd: {best_p['Kd']:.3f}\")"
         ]
     },
@@ -519,9 +519,14 @@ notebook = {
     "nbformat_minor": 2
 }
 
+import sys
+sys.path.insert(0, str(BASE_DIR))
+from scripts.organizar_ramas_colab import organize_branch
+notebook = organize_branch(notebook, "control")
+
 NOTEBOOK_PATH.parent.mkdir(parents=True, exist_ok=True)
 with open(NOTEBOOK_PATH, "w", encoding="utf-8") as f:
     json.dump(notebook, f, indent=2)
 
-print(f"[✔] Cuaderno Jupyter generado exitosamente en: {NOTEBOOK_PATH}")
+print(f"[OK] Cuaderno Jupyter generado exitosamente en: {NOTEBOOK_PATH}")
 print(f"    Total celdas: {len(cells)}")

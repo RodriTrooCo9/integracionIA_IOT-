@@ -1,216 +1,186 @@
-"""
-Servicio de Inferencia de Visión Artificial (YOLO11n + SAHI)
-Proyecto de Tesis - Invernadero de Papa
-"""
-
-import time
+"""YOLO26/YOLO11 inference with task-aware labels and explicit box semantics."""
+import hashlib
 import json
 import logging
+from collections import Counter
+from pathlib import Path
+import threading
+import time
+
 import cv2
 import numpy as np
-from pathlib import Path
-from typing import Dict, Any, List, Optional
-from server.app.core.config import settings
 
-logger = logging.getLogger("vision_service")
+from server.app.core.config import settings, BASE_DIR
 
-# Intentar importar Ultralytics y SAHI
-try:
-    from ultralytics import YOLO
-    ULTRALYTICS_DISPONIBLE = True
-except ImportError:
-    ULTRALYTICS_DISPONIBLE = False
+logger = logging.getLogger('vision_service')
+CLASES_PAPA = {0: 'tizon_tardio', 1: 'tizon_temprano', 2: 'hoja_sana',
+               3: 'mosca_minadora', 4: 'pulgon', 5: 'polilla_papa'}
+FOLIARES = {'tizon_tardio', 'tizon_temprano', 'hoja_sana'}
+LESIONES = {'tizon_tardio', 'tizon_temprano'}
+INSECTOS = {'mosca_minadora', 'pulgon', 'polilla_papa'}
 
-try:
-    from sahi import AutoDetectionModel
-    from sahi.predict import get_sliced_prediction
-    SAHI_DISPONIBLE = True
-except ImportError:
-    SAHI_DISPONIBLE = False
 
-CLASES_PAPA = {
-    0: "tizon_tardio",
-    1: "tizon_temprano",
-    2: "hoja_sana",
-    3: "mosca_minadora",
-    4: "pulgon",
-    5: "polilla_papa"
-}
+class VisionUnavailable(RuntimeError):
+    """Configured trained weights or an explicitly requested inference engine are absent."""
+
 
 class VisionInferenceService:
-    def __init__(self, weights_path: str = settings.MODEL_WEIGHTS_PATH):
-        self.weights_path = Path(weights_path)
+    def __init__(self, weights_path=None):
+        self.weights_path = Path(weights_path or settings.MODEL_WEIGHTS_PATH)
+        if not self.weights_path.is_absolute():
+            self.weights_path = BASE_DIR / self.weights_path
         self.modelo = None
         self.sahi_model = None
+        self.tarea = None
+        self.class_names = {}
+        self.box_semantics = settings.VISION_BOX_SEMANTICS
+        self.error_modelo = ''
+        self._lock = threading.RLock()
         self._cargar_modelo()
 
     def _cargar_modelo(self):
-        if not ULTRALYTICS_DISPONIBLE:
-            logger.warning("[VISION] Ultralytics no disponible en el entorno. Operando en modo emulación.")
+        # A general COCO checkpoint is not a plant disease classifier.
+        # In particular, never relabel COCO class IDs with CLASES_PAPA.
+        if not self.weights_path.is_file():
+            self.error_modelo = 'Faltan pesos entrenados. Configura MODEL_WEIGHTS_PATH con el best.pt de tu entrenamiento.'
+            logger.warning('[VISION] %s', self.error_modelo)
             return
-
         try:
-            if self.weights_path.exists():
-                logger.info(f"[VISION] Cargando pesos propios de tesis desde: {self.weights_path}")
-                self.modelo = YOLO(str(self.weights_path))
-            else:
-                logger.info("[VISION] Pesos específicos no encontrados. Inicializando YOLO11n base...")
-                self.modelo = YOLO("yolo11n.pt")
-                
-            if SAHI_DISPONIBLE and self.modelo is not None:
+            from ultralytics import YOLO
+            model = YOLO(str(self.weights_path))
+            if model.task not in {'detect', 'classify'}:
+                raise ValueError('Solo se admiten checkpoints de detección o clasificación')
+            names = dict(enumerate(model.names)) if isinstance(model.names, list) else dict(model.names)
+            names = {int(key): str(value) for key, value in names.items()}
+            if (not names or set(names) != set(range(len(names))) or
+                    len(set(names.values())) != len(names) or not set(names.values()) <= set(CLASES_PAPA.values())):
+                raise ValueError('Clases incompatibles con papa; no se admiten pesos COCO genéricos')
+            if model.task == 'classify' and not set(names.values()) <= FOLIARES:
+                raise ValueError('El clasificador debe ser foliar; no permite contar insectos')
+            metadata_file = self.weights_path.with_suffix('.metadata.json')
+            if metadata_file.is_file():
+                metadata = json.loads(metadata_file.read_text())
+                if metadata.get('task') != model.task:
+                    raise ValueError('Los metadatos no corresponden a la tarea de los pesos')
+                if {int(k): v for k, v in metadata.get('names', {}).items()} != names:
+                    raise ValueError('Las clases de los metadatos no corresponden a los pesos')
+                expected = metadata.get('weights_sha256')
+                if expected and hashlib.sha256(self.weights_path.read_bytes()).hexdigest() != expected:
+                    raise ValueError('El hash de los pesos no corresponde a sus metadatos')
+                self.box_semantics = metadata.get('box_semantics', 'unknown')
+            if self.box_semantics not in {'unknown', 'whole_leaf', 'lesion', 'none'}:
+                raise ValueError('Semántica de cajas inválida')
+            self.modelo, self.tarea, self.class_names = model, model.task, names
+        except Exception as exc:
+            self.error_modelo = f'No se pudieron cargar pesos compatibles: {exc}'
+            logger.error('[VISION] %s', self.error_modelo)
+            return
+        if self.tarea == 'detect':
+            try:
+                from sahi import AutoDetectionModel
                 self.sahi_model = AutoDetectionModel.from_pretrained(
-                    model_type="yolov8", # Compatible con YOLO11
-                    model=self.modelo,
-                    confidence_threshold=0.25,
-                    device="cpu"
-                )
-        except Exception as e:
-            logger.error(f"[VISION] Error al cargar modelo YOLO: {e}. Se utilizará inferencia heurística.")
-            self.modelo = None
+                    model_type='ultralytics', model=self.modelo,
+                    confidence_threshold=0.25, device='cpu')
+            except Exception as exc:
+                # Standard YOLO still works if optional sliced inference cannot initialize.
+                logger.warning('[VISION] SAHI no disponible: %s', exc)
 
-    def procesar_imagen(
-        self,
-        ruta_imagen: str,
-        tipo_origen: str = "HOJA_FOLLAJE",
-        usar_sahi: bool = False
-    ) -> Dict[str, Any]:
-        """
-        Ejecuta inferencia sobre la imagen y guarda la versión anotada.
-        - tipo_origen: 'HOJA_FOLLAJE' o 'TRAMPA_AMARILLA'
-        - usar_sahi: Forzar o deshabilitar segmentación por cortes
-        """
-        img_path = Path(ruta_imagen)
-        if not img_path.exists():
-            raise FileNotFoundError(f"No existe la imagen en {ruta_imagen}")
-
-        t0 = time.time()
-        img_bgr = cv2.imread(str(img_path))
-        if img_bgr is None:
-            raise ValueError(f"No se pudo decodificar la imagen {ruta_imagen}")
-
-        alto, ancho = img_bgr.shape[:2]
-        area_total = float(alto * ancho)
-        
-        # Modo Automático: usar SAHI en trampas si está disponible
-        es_trampa = (tipo_origen == "TRAMPA_AMARILLA")
-        aplicar_sahi = usar_sahi or (es_trampa and SAHI_DISPONIBLE and self.sahi_model is not None)
-
-        bboxes = []
-        conteo_total = 0
-        area_lesiones = 0.0
-        clases_detectadas = []
-        confianzas = []
-
-        if self.modelo is not None and not aplicar_sahi:
-            # Inferencia YOLO estándar
-            results = self.modelo(img_bgr, conf=0.25, verbose=False)
-            boxes = results[0].boxes
-            for box in boxes:
-                cls_id = int(box.cls[0].item())
-                conf = float(box.conf[0].item())
-                x1, y1, x2, y2 = [int(v) for v in box.xyxy[0].tolist()]
-                nombre_clase = CLASES_PAPA.get(cls_id, f"clase_{cls_id}")
-                
-                bboxes.append({
-                    "clase": nombre_clase,
-                    "confianza": round(conf, 3),
-                    "bbox": [x1, y1, x2, y2]
-                })
-                clases_detectadas.append(nombre_clase)
-                confianzas.append(conf)
-                
-                # Calcular área de lesión
-                w = max(0, x2 - x1)
-                h = max(0, y2 - y1)
-                area_lesiones += (w * h)
-                
-                # Dibujar en imagen anotada
-                color = (0, 0, 255) if "tizon" in nombre_clase else (0, 255, 0)
-                cv2.rectangle(img_bgr, (x1, y1), (x2, y2), color, 2)
-                cv2.putText(img_bgr, f"{nombre_clase} {conf:.2f}", (x1, max(15, y1 - 5)),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
-
-            conteo_total = len(bboxes)
-
-        elif aplicar_sahi and self.sahi_model is not None:
-            # Inferencia con SAHI (Slicing Aided Hyper Inference)
-            result = get_sliced_prediction(
-                str(img_path),
-                self.sahi_model,
-                slice_height=320,
-                slice_width=320,
-                overlap_height_ratio=0.2,
-                overlap_width_ratio=0.2,
-                verbose=0
-            )
-            for pred in result.object_prediction_list:
-                bbox_obj = pred.bbox
-                cls_id = pred.category.id
-                conf = float(pred.score.value)
-                x1, y1, x2, y2 = int(bbox_obj.minx), int(bbox_obj.miny), int(bbox_obj.maxx), int(bbox_obj.maxy)
-                nombre_clase = CLASES_PAPA.get(cls_id, pred.category.name or f"clase_{cls_id}")
-                
-                bboxes.append({
-                    "clase": nombre_clase,
-                    "confianza": round(conf, 3),
-                    "bbox": [x1, y1, x2, y2]
-                })
-                clases_detectadas.append(nombre_clase)
-                confianzas.append(conf)
-                
-                # Dibujar
-                cv2.rectangle(img_bgr, (x1, y1), (x2, y2), (0, 255, 255), 2)
-                cv2.putText(img_bgr, f"{nombre_clase} {conf:.2f}", (x1, max(15, y1 - 5)),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1)
-
-            conteo_total = len(bboxes)
-
-        else:
-            # Modo Emulación / Heurístico (cuando no hay GPU ni pesos cargados)
-            # Analiza colorimetría de la imagen para simular detección realista
-            hsv = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2HSV)
-            if es_trampa:
-                # Contar pequeños puntos oscuros en fondo amarillo
-                mascara_amarillo = cv2.inRange(hsv, np.array([20, 100, 100]), np.array([35, 255, 255]))
-                puntos_oscuros = cv2.bitwise_not(mascara_amarillo)
-                conteo_estimado = max(1, int(np.sum(puntos_oscuros > 0) / (area_total * 0.005)))
-                clase_principal = "pulgon"
-                conteo_total = min(40, conteo_estimado)
-                confianzas = [0.88]
-                bboxes.append({"clase": "pulgon", "confianza": 0.88, "bbox": [50, 50, 80, 80]})
+    def procesar_imagen(self, ruta_imagen, tipo_origen='HOJA_FOLLAJE', usar_sahi=False):
+        if tipo_origen not in {'HOJA_FOLLAJE', 'TRAMPA_AMARILLA'}:
+            raise ValueError('Tipo de origen no válido')
+        image_path = Path(ruta_imagen)
+        image = cv2.imread(str(image_path))
+        if image is None:
+            raise ValueError('No se pudo decodificar la imagen')
+        if self.modelo is None and not settings.VISION_DEMO_MODE:
+            raise VisionUnavailable(self.error_modelo)
+        start = time.perf_counter()
+        is_trap = tipo_origen == 'TRAMPA_AMARILLA'
+        simulated = self.modelo is None
+        annotations = []
+        confidences = []
+        height, width = image.shape[:2]
+        lesion_mask = np.zeros((height, width), dtype=np.uint8)
+        use_sahi = False
+        severity_available = False
+        count_available = False
+        with self._lock:
+            if simulated:
+                dominant, confidence = 'demostracion_sin_modelo', 0.0
+            elif self.tarea == 'classify':
+                if is_trap or usar_sahi:
+                    raise ValueError('El clasificador foliar no admite trampas ni SAHI')
+                result = self.modelo(image, verbose=False)[0]
+                if result.probs is None:
+                    raise ValueError('El checkpoint no produjo probabilidades de clasificación')
+                dominant = self.class_names[int(result.probs.top1)]
+                confidence = float(result.probs.top1conf.item())
+                cv2.putText(image, f'{dominant} {confidence:.2f}', (10, 25),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 200, 0), 2)
             else:
-                # Detectar parches necróticos marrones de tizón
-                mascara_marron = cv2.inRange(hsv, np.array([10, 80, 40]), np.array([25, 255, 120]))
-                pct_marron = float(np.sum(mascara_marron > 0)) / area_total * 100.0
-                area_lesiones = (pct_marron / 100.0) * area_total
-                conteo_total = 1 if pct_marron > 1.0 else 0
-                clase_principal = "tizon_tardio" if pct_marron > 3.0 else "hoja_sana"
-                confianzas = [0.85]
-                bboxes.append({"clase": clase_principal, "confianza": 0.85, "bbox": [30, 30, 200, 200]})
-
-        latencia_ms = (time.time() - t0) * 1000.0
-        
-        # Calcular severidad foliar en porcentaje
-        severidad_pct = min(100.0, (area_lesiones / area_total) * 100.0 * 2.5) if not es_trampa else 0.0
-        
-        # Clase dominante
-        clase_dom = max(set(clases_detectadas), key=clases_detectadas.count) if clases_detectadas else ("hoja_sana" if not es_trampa else "sin_captura")
-        conf_prom = float(np.mean(confianzas)) if confianzas else 0.0
-
-        # Guardar imagen anotada
-        ruta_anotada = str(img_path.parent / f"anotada_{img_path.name}")
-        cv2.imwrite(ruta_anotada, img_bgr)
-
+                relevant_classes = INSECTOS if is_trap else FOLIARES
+                if not set(self.class_names.values()) & relevant_classes:
+                    raise ValueError('El modelo cargado no incluye clases para ese tipo de imagen')
+                if usar_sahi and self.sahi_model is None:
+                    raise VisionUnavailable('SAHI solicitado pero no está disponible para el modelo')
+                use_sahi = self.sahi_model is not None and (usar_sahi or is_trap)
+                detections = []
+                if use_sahi:
+                    from sahi.predict import get_sliced_prediction
+                    results = get_sliced_prediction(str(image_path), self.sahi_model,
+                                                   slice_height=320, slice_width=320,
+                                                   overlap_height_ratio=0.2, overlap_width_ratio=0.2,
+                                                   verbose=0)
+                    for prediction in results.object_prediction_list:
+                        box = prediction.bbox
+                        detections.append((prediction.category.id, float(prediction.score.value),
+                                           (box.minx, box.miny, box.maxx, box.maxy)))
+                else:
+                    result = self.modelo(image, conf=0.25, verbose=False)[0]
+                    for box in result.boxes:
+                        detections.append((int(box.cls[0].item()), float(box.conf[0].item()),
+                                           box.xyxy[0].tolist()))
+                for class_id, probability, coords in detections:
+                    name = self.class_names[int(class_id)]
+                    if name not in relevant_classes:
+                        continue
+                    x1, y1, x2, y2 = (int(v) for v in coords)
+                    x1, x2 = max(0, min(width, x1)), max(0, min(width, x2))
+                    y1, y2 = max(0, min(height, y1)), max(0, min(height, y2))
+                    if x2 <= x1 or y2 <= y1:
+                        continue
+                    annotations.append({'clase': name, 'confianza': round(probability, 3),
+                                        'bbox': [x1, y1, x2, y2]})
+                    confidences.append(probability)
+                    if name in LESIONES and self.box_semantics == 'lesion':
+                        lesion_mask[y1:y2, x1:x2] = 255
+                    cv2.rectangle(image, (x1, y1), (x2 - 1, y2 - 1), (0, 0, 255) if name in LESIONES else (0, 200, 0), 2)
+                    cv2.putText(image, f'{name} {probability:.2f}', (x1, max(15, y1 - 5)),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 200, 0), 1)
+                names = [b['clase'] for b in annotations]
+                dominant = Counter(names).most_common(1)[0][0] if names else 'sin_deteccion'
+                confidence = float(np.mean(confidences)) if confidences else 0.0
+                severity_available = not is_trap and self.box_semantics == 'lesion' and bool(set(self.class_names.values()) & LESIONES)
+                count_available = is_trap
+        output = image_path.with_name('anotada_' + image_path.name)
+        if not cv2.imwrite(str(output), image):
+            raise OSError('No se pudo guardar la imagen anotada')
         return {
-            "clase_detectada": clase_dom,
-            "confianza": round(conf_prom, 3),
-            "conteo_insectos": conteo_total,
-            "severidad_porcentaje": round(severidad_pct, 2),
-            "tiempo_inferencia_ms": round(latencia_ms, 2),
-            "procesado_con_sahi": bool(aplicar_sahi),
-            "bbox_json": json.dumps(bboxes),
-            "ruta_imagen_original": str(img_path),
-            "ruta_imagen_anotada": ruta_anotada
+            'clase_detectada': dominant, 'confianza': round(confidence, 3),
+            'bbox_json': json.dumps(annotations),
+            # Legacy numeric fields remain serializable; validity flags distinguish 0 from N/A.
+            'conteo_insectos': sum(a['clase'] in INSECTOS for a in annotations) if count_available else 0,
+            'severidad_porcentaje': round(float(np.mean(lesion_mask > 0) * 100), 2) if severity_available else 0.0,
+            'severidad_disponible': severity_available,
+            'conteo_disponible': count_available,
+            'metrica_severidad': 'cobertura_cajas_lesion_imagen' if severity_available else 'no_disponible',
+            'apto_supervision': not simulated and (severity_available or count_available),
+            'simulado': simulated, 'tarea_modelo': self.tarea,
+            'semantica_cajas': self.box_semantics,
+            'tiempo_inferencia_ms': round((time.perf_counter() - start) * 1000, 2),
+            'procesado_con_sahi': bool(use_sahi),
+            'ruta_imagen_original': str(image_path), 'ruta_imagen_anotada': str(output),
         }
+
 
 vision_service = VisionInferenceService()

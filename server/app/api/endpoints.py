@@ -6,6 +6,8 @@ Proyecto de Tesis - Cultivo de Papa (La Paz, Bolivia)
 import os
 import shutil
 import time
+import asyncio
+from uuid import uuid4
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, List, Dict, Any
@@ -15,7 +17,7 @@ from pydantic import BaseModel, Field
 
 from server.app.core.config import settings
 from server.app.services.database import db_service
-from server.app.services.vision_service import vision_service
+from server.app.services.vision_service import vision_service, VisionUnavailable
 from server.app.services.mqtt_client import mqtt_service
 from server.app.services.telegram_bot import telegram_service
 
@@ -55,11 +57,13 @@ async def health_check():
         "version": settings.VERSION,
         "mqtt_conectado": mqtt_service.conectado,
         "sqlite_db": Path(settings.SQLITE_DB_PATH).exists(),
+        "vision": {"disponible": vision_service.modelo is not None,
+                   "tarea": vision_service.tarea, "error": vision_service.error_modelo},
         "timestamp_utc": datetime.now(timezone.utc).isoformat()
     }
 
 # ------------------------------------------------------------------------------
-# 2. Inferencia de Visión Artificial (YOLO11n + SAHI)
+# 2. Inferencia de Visión Artificial (YOLO26 / YOLO11 + SAHI)
 # ------------------------------------------------------------------------------
 @router.post("/vision/inferir", tags=["Visión Artificial"])
 async def inferir_imagen(
@@ -70,13 +74,15 @@ async def inferir_imagen(
 ):
     """
     Recibe una imagen, ejecuta detección (YOLO11n / SAHI), guarda en BD,
-    publica evento en MQTT y genera alerta a Telegram si la severidad es crítica.
+    publica en MQTT solo métricas válidas para supervisión (no pilotos de hojas completas).
     """
     upload_dir = Path(settings.UPLOAD_DIR)
     upload_dir.mkdir(parents=True, exist_ok=True)
     
     timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
-    nombre_limpio = f"{timestamp_str}_{imagen.filename.replace(' ', '_')}"
+    suffix = Path(imagen.filename or "image.jpg").suffix.lower()
+    suffix = suffix if suffix in {".jpg", ".jpeg", ".png", ".webp"} else ".jpg"
+    nombre_limpio = f"{timestamp_str}_{uuid4().hex}{suffix}"
     ruta_destino = upload_dir / nombre_limpio
 
     # Guardar archivo temporal en disco
@@ -88,11 +94,17 @@ async def inferir_imagen(
 
     # Ejecutar inferencia de visión
     try:
-        resultado = vision_service.procesar_imagen(
+        resultado = await asyncio.to_thread(vision_service.procesar_imagen,
             ruta_imagen=str(ruta_destino),
             tipo_origen=tipo_origen,
             usar_sahi=usar_sahi
         )
+    except VisionUnavailable as e:
+        ruta_destino.unlink(missing_ok=True)
+        raise HTTPException(status_code=503, detail=str(e)) from e
+    except ValueError as e:
+        ruta_destino.unlink(missing_ok=True)
+        raise HTTPException(status_code=422, detail=str(e)) from e
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error en inferencia de visión: {e}")
 
@@ -123,11 +135,12 @@ async def inferir_imagen(
         "severidad_porcentaje": resultado["severidad_porcentaje"],
         "tiempo_ms": resultado["tiempo_inferencia_ms"]
     }
-    publicado_mqtt = mqtt_service.publicar(settings.TOPIC_VISION_DETECCIONES, mqtt_payload)
+    apto_supervision = resultado.get("apto_supervision", False)
+    publicado_mqtt = mqtt_service.publicar(settings.TOPIC_VISION_DETECCIONES, mqtt_payload) if apto_supervision else False
 
     # Evaluar disparo de alarma a Telegram ante severidad crítica
     disparo_alerta = False
-    if resultado["severidad_porcentaje"] >= 15.0 or resultado["conteo_insectos"] >= 15:
+    if apto_supervision and (resultado["severidad_porcentaje"] >= 15.0 or resultado["conteo_insectos"] >= 15):
         disparo_alerta = True
         nivel_alerta = "CRÍTICO" if (resultado["severidad_porcentaje"] >= 25.0 or resultado["conteo_insectos"] >= 25) else "ALTO"
         

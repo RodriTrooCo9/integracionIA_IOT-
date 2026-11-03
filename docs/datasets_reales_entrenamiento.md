@@ -69,40 +69,31 @@ enfermedad del proveedor también necesitan revisión agronómica.
 porcentaje de severidad foliar.** El clasificador aprende su orden de etiquetas
 desde las carpetas; consultar `model.names`, no asumir el orden numérico del detector.
 
-## Rutas correctas en Jupyter y Colab
+## Orden de ejecución en Colab
 
-Abre `notebooks/02_curaduria_dataset_vision.ipynb` y ejecuta sus celdas en orden.
-La Celda 2 localiza la raíz que contiene `scripts/preparar_datasets_reales.py`;
-la Celda 6 ejecuta la descarga y la preparación completa. No crea una carpeta
-vacía en `notebooks/data` ni supone que estás en `/content`.
+Empezar en `notebooks/00_inicio_y_datasets.ipynb`, celdas de código 1–4.
+La celda 1 localiza la raíz o extrae `colab_yolo26_listo.zip` desde Mi unidad;
+la 4 prepara/verifica ambos conjuntos.
+No se crea `notebooks/data` ni se usa el YAML anterior de seis clases.
 
-En Colab, copia o clona el proyecto primero. Si está en Google Drive, monta Drive
-y configura antes de la Celda 2:
+Luego ejecutar:
 
-```python
-import os
-os.environ['IOTTESIS_ROOT'] = '/content/drive/MyDrive/Tesis_IOT_Papa'
-```
+1. `01_entrenar_clasificador.ipynb`, celdas 1–6: PlantVillage / YOLO26n-cls.
+2. `02_entrenar_detector.ipynb`, celdas 1–6: PlantDoc / YOLO26n.
+3. `03_comparar_detectores.ipynb`, opcional: reutiliza YOLO26 y compara con YOLO11/YOLOv8.
+4. `04_evaluacion_y_exportacion.ipynb`, celdas 1–6: test final y entrega. Las 7–9 son opcionales.
 
-La ruta debe contener el proyecto y su carpeta `scripts/`, no solo imágenes.
-Al copiar el dataset a otro ordenador, los cuadernos actualizan `path` de su YAML
-antes de utilizarlo. `data/data.yaml` conserva la configuración previa de seis
-clases; **no es el YAML de este piloto**.
+Test no se evalúa en los cuadernos de entrenamiento ni se usa para seleccionar.
+Cada nueva sesión repite sus celdas 1–3 y recupera experimentos guardados desde disco.
+Los entrenamientos de clasificación y detección son independientes.
 
-## Entrenamiento
+Para la copia exacta a Drive, `make colab-package` crea un ZIP local con los datasets
+ya particionados. La [guía de Colab](orden_cuadernos_colab.md) explica extracción,
+pendientes y estado actual. `make colab-status` inspecciona lo que existe sin entrenar.
 
-Abre `notebooks/05_entrenamiento_datasets_reales.ipynb`:
-
-1. Ejecuta instalación y preparación/verificación.
-2. Sección A: `yolo11n-cls.pt` aprende clasificación con PlantVillage.
-3. Sección B: `yolo11n.pt` aprende detección de hojas con dos clases de enfermedad de PlantDoc.
-4. Evalúa cada modelo en su test y conserva resultados, configuración y pesos en
-   `runs/datasets_reales/`.
-
-Las tareas son independientes. El cuaderno de comparación anterior de seis clases
-no es la entrada de entrenamiento de estos datos. El servidor actual requiere
-una adaptación explícita antes de usar cualquiera de estos pesos: no sustituir
-automáticamente el modelo de lesiones/insectos por un clasificador o detector de hojas.
+El backend admite ambas tareas mediante `MODEL_WEIGHTS_PATH` y metadatos; no
+transforma cajas de hojas ni etiquetas de clasificación en severidad o conteo de plagas.
+Consultar [la integración de YOLO26](yolo26.md) para pesos y límites de despliegue.
 
 ## Trazabilidad y límites de evaluación
 

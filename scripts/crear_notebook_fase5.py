@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 crear_notebook_fase5.py
-Construye el notebook notebooks/04_modelo_riesgo_fusion_decision.ipynb
+Construye el notebook notebooks/riesgo/01_modelo_riesgo_demo.ipynb
 para la Fase 5: Modelo de riesgo fitopatológico, comparativa ML, BlightManager,
 calibración, SHAP y lazo supervisor externo en cascada.
 """
@@ -10,7 +10,7 @@ import json
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-NOTEBOOK_PATH = BASE_DIR / "notebooks" / "04_modelo_riesgo_fusion_decision.ipynb"
+NOTEBOOK_PATH = BASE_DIR / "notebooks" / "riesgo" / "01_modelo_riesgo_demo.ipynb"
 
 cells = [
     {
@@ -80,7 +80,7 @@ cells = [
             "if torch.cuda.is_available():\n",
             "    torch.cuda.manual_seed_all(SEED)\n",
             "\n",
-            "print(f\"[✔] Entorno inicializado | PyTorch: {torch.__version__} | XGBoost: {xgb.__version__} | SHAP: {shap.__version__}\")"
+            "print(f\"[OK] Entorno inicializado | PyTorch: {torch.__version__} | XGBoost: {xgb.__version__} | SHAP: {shap.__version__}\")"
         ]
     },
     {
@@ -188,11 +188,11 @@ cells = [
             "dataset_file = Path(\"../data/synthetic/dataset_agroclimatico_invernadero.csv\")\n",
             "if dataset_file.exists():\n",
             "    df = pd.read_csv(dataset_file)\n",
-            "    print(f\"[✔] Dataset cargado desde disco: {dataset_file} ({len(df)} registros)\")\n",
+            "    print(f\"[OK] Dataset cargado desde disco: {dataset_file} ({len(df)} registros)\")\n",
             "else:\n",
             "    print(\"[i] Generando dataset biofísico sintético en memoria...\")\n",
             "    df = generar_dataset_invernadero(dias=90, seed=SEED)\n",
-            "    print(f\"[✔] Dataset sintético generado con éxito: {len(df)} registros horarios.\")\n",
+            "    print(f\"[OK] Dataset sintético generado con éxito: {len(df)} registros horarios.\")\n",
             "\n",
             "print(\"Primeras filas del dataset agroclimático:\")\n",
             "display(df.head(3))"
@@ -247,7 +247,7 @@ cells = [
             "    'lwh_max_24h', 'lwh_suma_48h',\n",
             "    'delta_vpd_1h', 'delta_temp_1h', 'delta_hum_1h', 'grados_hora_24h'\n",
             "]\n",
-            "print(f\"[✔] {len(feature_cols)} características bioclimáticas listas para entrenamiento.\")"
+            "print(f\"[OK] {len(feature_cols)} características bioclimáticas listas para entrenamiento.\")"
         ]
     },
     {
@@ -308,7 +308,7 @@ cells = [
             "pr_auc_bm = average_precision_score(y_test, prob_bm_test)\n",
             "brier_bm = brier_score_loss(y_test, prob_bm_test)\n",
             "f1_bm = f1_score(y_test, pred_bm_test)\n",
-            "print(f\"[✔] BlightManager Línea Base | ROC-AUC: {auc_bm:.4f} | PR-AUC: {pr_auc_bm:.4f} | Brier: {brier_bm:.4f} | F1: {f1_bm:.4f}\")"
+            "print(f\"[OK] BlightManager Línea Base | ROC-AUC: {auc_bm:.4f} | PR-AUC: {pr_auc_bm:.4f} | Brier: {brier_bm:.4f} | F1: {f1_bm:.4f}\")"
         ]
     },
     {
@@ -360,7 +360,7 @@ cells = [
             "pred_svm_test = (prob_svm_test >= 0.50).astype(int)\n",
             "lat_svm = (time.time() - t0) / len(df_test) * 1000.0\n",
             "\n",
-            "print(f\"[✔] Modelos ML entrenados y calibrados.\")"
+            "print(f\"[OK] Modelos ML entrenados y calibrados.\")"
         ]
     },
     {
@@ -412,7 +412,7 @@ cells = [
             "    prob_lstm_test = torch.sigmoid(test_logits).numpy()\n",
             "lat_lstm = (time.time() - t0) / len(X_test_seq) * 1000.0\n",
             "pred_lstm_test = (prob_lstm_test >= 0.50).astype(int)\n",
-            "print(f\"[✔] LSTM entrenada con éxito (Latencia CPU: {lat_lstm:.3f} ms/muestra).\")"
+            "print(f\"[OK] LSTM entrenada con éxito (Latencia CPU: {lat_lstm:.3f} ms/muestra).\")"
         ]
     },
     {
@@ -427,7 +427,7 @@ cells = [
             "metricas = [\n",
             "    {\"Modelo\": \"BlightManager (Wallin 1962)\", \"ROC-AUC\": roc_auc_score(y_test, prob_bm_test), \"PR-AUC\": average_precision_score(y_test, prob_bm_test), \"Brier\": brier_score_loss(y_test, prob_bm_test), \"F1\": f1_score(y_test, pred_bm_test), \"Latencia (ms)\": lat_bm, \"Estado\": \"Línea Base\"},\n",
             "    {\"Modelo\": \"Random Forest (Calibrado)\", \"ROC-AUC\": roc_auc_score(y_test, prob_rf_test), \"PR-AUC\": average_precision_score(y_test, prob_rf_test), \"Brier\": brier_score_loss(y_test, prob_rf_test), \"F1\": f1_score(y_test, pred_rf_test), \"Latencia (ms)\": lat_rf, \"Estado\": \"Evaluado\"},\n",
-            "    {\"Modelo\": \"XGBoost (Calibrado)\", \"ROC-AUC\": roc_auc_score(y_test, prob_xgb_test), \"PR-AUC\": average_precision_score(y_test, prob_xgb_test), \"Brier\": brier_score_loss(y_test, prob_xgb_test), \"F1\": f1_score(y_test, pred_xgb_test), \"Latencia (ms)\": lat_xgb, \"Estado\": \"Ganador ⭐\"},\n",
+            "    {\"Modelo\": \"XGBoost (Calibrado)\", \"ROC-AUC\": roc_auc_score(y_test, prob_xgb_test), \"PR-AUC\": average_precision_score(y_test, prob_xgb_test), \"Brier\": brier_score_loss(y_test, prob_xgb_test), \"F1\": f1_score(y_test, pred_xgb_test), \"Latencia (ms)\": lat_xgb, \"Estado\": \"Ganador [seleccionado]\"},\n",
             "    {\"Modelo\": \"SVM RBF (Calibrado)\", \"ROC-AUC\": roc_auc_score(y_test, prob_svm_test), \"PR-AUC\": average_precision_score(y_test, prob_svm_test), \"Brier\": brier_score_loss(y_test, prob_svm_test), \"F1\": f1_score(y_test, pred_svm_test), \"Latencia (ms)\": lat_svm, \"Estado\": \"Evaluado\"},\n",
             "    {\"Modelo\": \"Bioclimatic LSTM\", \"ROC-AUC\": roc_auc_score(y_test_seq, prob_lstm_test), \"PR-AUC\": average_precision_score(y_test_seq, prob_lstm_test), \"Brier\": brier_score_loss(y_test_seq, prob_lstm_test), \"F1\": f1_score(y_test_seq, pred_lstm_test), \"Latencia (ms)\": lat_lstm, \"Estado\": \"Evaluado\"}\n",
             "]\n",
@@ -643,8 +643,13 @@ notebook_dict = {
     "nbformat_minor": 4
 }
 
+import sys
+sys.path.insert(0, str(BASE_DIR))
+from scripts.organizar_ramas_colab import organize_branch
+notebook_dict = organize_branch(notebook_dict, "riesgo")
+
 NOTEBOOK_PATH.parent.mkdir(parents=True, exist_ok=True)
 with open(NOTEBOOK_PATH, "w", encoding="utf-8") as f:
     json.dump(notebook_dict, f, indent=2, ensure_ascii=False)
 
-print(f"✔ Notebook de Colab guardado con éxito en: {NOTEBOOK_PATH}")
+print(f"[OK] Notebook de Colab guardado con éxito en: {NOTEBOOK_PATH}")

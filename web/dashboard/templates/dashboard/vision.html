@@ -7,7 +7,7 @@
         <div>
             <h1 class="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
                 <i data-lucide="camera" class="w-7 h-7 text-emerald-400"></i>
-                Visor de Patologías y Plagas (YOLO11n + SAHI)
+                Visor de Patologías y Plagas (YOLO26 / YOLO11 + SAHI)
             </h1>
             <p class="text-slate-400 text-sm mt-1">
                 Inspección fitosanitaria foliar y conteo en trampas cromáticas amarillas a 3600 msnm.
@@ -16,7 +16,7 @@
         <div class="flex items-center gap-2">
             <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                 <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
-                mAP@50: 0.884 | Latencia: 78.4 ms
+                Pesos propios · métricas según entrenamiento
             </span>
         </div>
     </div>
@@ -45,10 +45,10 @@
                 <div class="flex items-center justify-between p-3 rounded-xl bg-slate-900/60 border border-slate-800">
                     <div>
                         <span class="text-sm font-medium text-slate-200 block">Slicing SAHI (Micro-objetos)</span>
-                        <span class="text-[11px] text-slate-500">Ventana deslizante 320×320 (+39.7% recall en pulgón)</span>
+                        <span class="text-[11px] text-slate-500">Ventana 320×320; solo modelos de detección</span>
                     </div>
                     <label class="relative inline-flex items-center cursor-pointer">
-                        <input type="checkbox" id="check-sahi" class="sr-only peer" checked>
+                        <input type="checkbox" id="check-sahi" class="sr-only peer">
                         <div class="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
                     </label>
                 </div>
@@ -60,7 +60,7 @@
 
                 <button onclick="subirYProcesar()" id="btn-procesar" class="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-semibold text-sm transition-all shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2">
                     <i data-lucide="play" class="w-4 h-4"></i>
-                    <span>Ejecutar Inferencia YOLO11n</span>
+                    <span>Ejecutar Inferencia YOLO26 / YOLO11</span>
                 </button>
             </div>
 
@@ -158,7 +158,7 @@
                             {% elif d.severidad_porcentaje > 0 %}
                             {{ d.severidad_porcentaje|floatformat:1 }}% daño
                             {% else %}
-                            Estado Sano
+                            Sin métrica de severidad registrada
                             {% endif %}
                         </span>
                         <span class="font-mono text-slate-500 text-[10px]">{{ d.timestamp|date:"d/m H:i" }}</span>
@@ -187,7 +187,7 @@
 
         const btn = document.getElementById('btn-procesar');
         btn.disabled = true;
-        btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Procesando con YOLO11n...`;
+        btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Procesando con YOLO...`;
         lucide.createIcons();
 
         const formData = new FormData();
@@ -208,8 +208,8 @@
 
                 document.getElementById('res-clase').innerText = data.clase_detectada;
                 document.getElementById('res-confianza').innerText = (data.confianza * 100).toFixed(1) + "%";
-                document.getElementById('res-conteo').innerText = data.conteo_insectos + " ind.";
-                document.getElementById('res-severidad').innerText = (data.severidad_porcentaje).toFixed(1) + "%";
+                document.getElementById('res-conteo').innerText = data.conteo_disponible ? data.conteo_insectos + " ind." : "No aplica";
+                document.getElementById('res-severidad').innerText = data.severidad_disponible ? data.severidad_porcentaje.toFixed(1) + "%" : "No disponible";
                 document.getElementById('res-tiempo').innerText = (data.tiempo_ms).toFixed(1) + " ms";
                 
                 // Extraer nombre de archivo para servirlo
@@ -223,7 +223,7 @@
             alert("Error de conexión durante inferencia: " + err);
         } finally {
             btn.disabled = false;
-            btn.innerHTML = `<i data-lucide="play" class="w-4 h-4"></i><span>Ejecutar Inferencia YOLO11n</span>`;
+            btn.innerHTML = `<i data-lucide="play" class="w-4 h-4"></i><span>Ejecutar Inferencia YOLO26 / YOLO11</span>`;
             lucide.createIcons();
         }
     }

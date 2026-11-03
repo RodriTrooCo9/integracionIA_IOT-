@@ -38,7 +38,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
-    description="Backend de Inferencia YOLO11n + SAHI, Supervisión de Riesgo y Control de Setpoints IoT.",
+    description="Backend de inferencia YOLO26/YOLO11 y SAHI, supervisión de riesgo y control IoT.",
     lifespan=lifespan
 )
 

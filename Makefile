@@ -9,7 +9,7 @@ PYTEST := .venv/bin/pytest
 CLOUDFLARED := $(shell which cloudflared 2>/dev/null || echo ".venv/bin/cloudflared")
 PORT := 8000
 
-.PHONY: all help init-db test check server tunnel run simulator docker-up clean
+.PHONY: all help init-db test check server tunnel run simulator docker-up clean colab-status colab-package colab-notebooks
 
 # Objetivo por defecto: muestra ayuda
 help:
@@ -19,12 +19,15 @@ help:
 	@echo "Comandos disponibles:"
 	@echo "  make run        : Ejecuta TODO en orden (BD -> Test -> Django + Cloudflared)"
 	@echo "  make init-db    : Inicializa tablas SQLite y puebla ensayos E1 a E8"
-	@echo "  make test       : Ejecuta la suite completa de 23 pruebas Pytest"
+	@echo "  make test       : Ejecuta la suite completa de pruebas Pytest"
 	@echo "  make check      : Verifica el estado del sistema Django"
 	@echo "  make server     : Inicia únicamente el servidor web Django en el puerto $(PORT)"
 	@echo "  make tunnel     : Inicia únicamente el túnel seguro de Cloudflare"
 	@echo "  make simulator  : Inicia el simulador de telemetría MQTT del ESP32"
 	@echo "  make docker-up  : Levanta los servicios de infraestructura Docker"
+	@echo "  make colab-status   : Muestra datasets, checkpoints y qué cuaderno falta"
+	@echo "  make colab-package  : Prepara ZIP local para subir a Drive"
+	@echo "  make colab-notebooks: Regenera el flujo 00–04 (descarta sus salidas guardadas)"
 	@echo "  make clean      : Limpia archivos temporales y caché de Python"
 	@echo "========================================================================"
 
@@ -34,7 +37,7 @@ init-db:
 	@$(PYTHON) scripts/seed_experiments.py
 
 test:
-	@echo "==> [2/4] Ejecutando suite de 23 pruebas unitarias y de integración..."
+	@echo "==> [2/4] Ejecutando suite de pruebas unitarias y de integración..."
 	@$(PYTEST) tests/ -v
 
 check:
@@ -92,3 +95,13 @@ branches:
 	@echo "Ramas locales activas:"
 	@git branch -v
 
+
+# Colab: these commands do not start GPU training or contact the ESP32.
+colab-status:
+	@$(PYTHON) scripts/flujo_colab.py --verify-datasets
+
+colab-package:
+	@$(PYTHON) scripts/empaquetar_colab.py
+
+colab-notebooks:
+	@$(PYTHON) scripts/crear_notebooks_vision.py

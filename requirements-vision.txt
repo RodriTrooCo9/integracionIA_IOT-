@@ -1,0 +1,6 @@
+# Optional runtime for YOLO26/YOLO11 training and inference (including Colab).
+# Install separately from the server's historical scientific dependency pins.
+ultralytics>=8.4.0,<9
+sahi>=0.12,<0.13
+Pillow>=10.3,<13
+PyYAML>=6,<7

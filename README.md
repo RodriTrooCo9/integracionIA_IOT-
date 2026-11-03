@@ -11,6 +11,36 @@ Repositorio oficial del proyecto de grado / tesis:
 
 ---
 
+## Empieza aquí: Colab y YOLO26
+
+Abre [00_inicio_y_datasets.ipynb](notebooks/00_inicio_y_datasets.ipynb), celdas 1–4.
+Para usarlo en Colab, sube `colab_yolo26_listo.zip` a Mi unidad y abre el cuaderno
+actualizado: su celda 1 monta Drive y extrae el paquete si falta el proyecto.
+
+**Ruta corta:** `00 → 01 → 02 → 04`.
+**Comparación de tesis:** `00 → 01 → 02 → 03 → 04`.
+
+| Paso | Función |
+| --- | --- |
+| 00 | Proyecto, datasets reales y pendientes. Sin entrenamiento. |
+| 01 | Clasificador YOLO26n-cls / PlantVillage. |
+| 02 | Detector YOLO26n / PlantDoc. |
+| 03 | Opcional: comparación por validación; reutiliza entrenamientos equivalentes. |
+| 04 | Test final una vez, resumen y exportación opcional. |
+
+El [índice de celdas](notebooks/README.md) y la [guía completa](docs/orden_cuadernos_colab.md)
+indican exactamente qué ejecutar. PID y riesgo están separados en `notebooks/control/`
+y `notebooks/riesgo/`; los cuadernos previos se conservan en `notebooks/archivo/`.
+
+```bash
+make colab-status    # qué hay listo y qué falta, sin entrenar
+make colab-package   # paquete local con datos preparados para subir a Drive
+```
+
+Los datasets locales están preparados; los pesos y su evaluación se generan al
+entrenar. No se suben automáticamente a Drive. Instala `requirements-vision.txt`
+en el entorno de inferencia; consulta [la entrega de pesos al backend](docs/yolo26.md).
+
 ## 1. Arquitectura General del Sistema
 
 El sistema implementa una arquitectura en cascada desacoplada:
