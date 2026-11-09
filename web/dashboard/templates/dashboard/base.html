@@ -26,47 +26,60 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- Lucide Icons CDN -->
     <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- KaTeX para renderizado matemático limpio -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"
+        onload="renderMathInElement(document.body, {delimiters: [{left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}]});"></script>
     <style>
         .glass-panel {
-            background: rgba(15, 23, 42, 0.75);
+            background: rgba(15, 23, 42, 0.78);
             backdrop-filter: blur(12px);
-            border: 1px solid rgba(51, 65, 85, 0.6);
+            border: 1px solid rgba(51, 65, 85, 0.65);
+        }
+        .dropzone-active {
+            border-color: #10b981 !important;
+            background: rgba(16, 185, 129, 0.08) !important;
         }
     </style>
 </head>
-<body class="h-full flex flex-col font-sans antialiased">
+<body class="min-h-full flex flex-col font-sans antialiased selection:bg-emerald-500/30 selection:text-emerald-200">
     <!-- Navbar Superior -->
     <header class="border-b border-slate-800 bg-slate-900/90 backdrop-blur sticky top-0 z-50">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
             <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                <a href="{% url 'dashboard:index' %}" class="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center shadow-lg shadow-emerald-500/20">
                     <i data-lucide="sprout" class="w-6 h-6 text-white"></i>
-                </div>
+                </a>
                 <div>
-                    <span class="font-bold text-lg text-white tracking-tight">AgriControl IoT–IA</span>
-                    <span class="hidden sm:inline-block text-xs px-2 py-0.5 ml-2 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Papa • La Paz 3600m</span>
+                    <a href="{% url 'dashboard:index' %}" class="font-bold text-lg text-white tracking-tight hover:text-emerald-400 transition-colors">AgriControl IoT–IA</a>
+                    <span class="hidden sm:inline-block text-xs px-2 py-0.5 ml-2 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Solanum tuberosum • La Paz 3600 msnm (67.5 kPa)</span>
                 </div>
             </div>
 
             <nav class="hidden md:flex items-center gap-1">
-                <a href="{% url 'dashboard:index' %}" class="px-3 py-2 rounded-lg text-sm font-medium transition-colors hover:bg-slate-800 hover:text-white {% if request.resolver_match.url_name == 'index' %}bg-slate-800 text-emerald-400{% else %}text-slate-400{% endif %}">
+                <a href="{% url 'dashboard:index' %}" class="px-3 py-2 rounded-lg text-sm font-medium transition-colors hover:bg-slate-800 hover:text-white {% if request.resolver_match.url_name == 'index' %}bg-slate-800 text-emerald-400 border border-emerald-500/30{% else %}text-slate-400{% endif %}">
                     <i data-lucide="layout-dashboard" class="w-4 h-4 inline mr-1"></i> En Vivo
                 </a>
-                <a href="{% url 'dashboard:control_pid' %}" class="px-3 py-2 rounded-lg text-sm font-medium transition-colors hover:bg-slate-800 hover:text-white {% if request.resolver_match.url_name == 'control_pid' %}bg-slate-800 text-emerald-400{% else %}text-slate-400{% endif %}">
+                <a href="{% url 'dashboard:control_pid' %}" class="px-3 py-2 rounded-lg text-sm font-medium transition-colors hover:bg-slate-800 hover:text-white {% if request.resolver_match.url_name == 'control_pid' %}bg-slate-800 text-emerald-400 border border-emerald-500/30{% else %}text-slate-400{% endif %}">
                     <i data-lucide="sliders" class="w-4 h-4 inline mr-1"></i> Control PID
                 </a>
-                <a href="{% url 'dashboard:vision' %}" class="px-3 py-2 rounded-lg text-sm font-medium transition-colors hover:bg-slate-800 hover:text-white {% if request.resolver_match.url_name == 'vision' %}bg-slate-800 text-emerald-400{% else %}text-slate-400{% endif %}">
-                    <i data-lucide="camera" class="w-4 h-4 inline mr-1"></i> Visión YOLO
+                <a href="{% url 'dashboard:vision' %}" class="px-3 py-2 rounded-lg text-sm font-medium transition-colors hover:bg-slate-800 hover:text-white {% if request.resolver_match.url_name == 'vision' %}bg-slate-800 text-emerald-400 border border-emerald-500/30{% else %}text-slate-400{% endif %}">
+                    <i data-lucide="camera" class="w-4 h-4 inline mr-1"></i> Visión YOLO + Subir
                 </a>
-                <a href="{% url 'dashboard:gemelo_digital' %}" class="px-3 py-2 rounded-lg text-sm font-medium transition-colors hover:bg-slate-800 hover:text-white {% if request.resolver_match.url_name == 'gemelo_digital' %}bg-slate-800 text-emerald-400{% else %}text-slate-400{% endif %}">
+                <a href="{% url 'dashboard:gemelo_digital' %}" class="px-3 py-2 rounded-lg text-sm font-medium transition-colors hover:bg-slate-800 hover:text-white {% if request.resolver_match.url_name == 'gemelo_digital' %}bg-slate-800 text-emerald-400 border border-emerald-500/30{% else %}text-slate-400{% endif %}">
                     <i data-lucide="box" class="w-4 h-4 inline mr-1"></i> Gemelo Digital
                 </a>
-                <a href="{% url 'dashboard:experimentos' %}" class="px-3 py-2 rounded-lg text-sm font-medium transition-colors hover:bg-slate-800 hover:text-white {% if request.resolver_match.url_name == 'experimentos' %}bg-slate-800 text-emerald-400{% else %}text-slate-400{% endif %}">
+                <a href="{% url 'dashboard:experimentos' %}" class="px-3 py-2 rounded-lg text-sm font-medium transition-colors hover:bg-slate-800 hover:text-white {% if request.resolver_match.url_name == 'experimentos' %}bg-slate-800 text-emerald-400 border border-emerald-500/30{% else %}text-slate-400{% endif %}">
                     <i data-lucide="flask-conical" class="w-4 h-4 inline mr-1"></i> Ensayos E1-E8
                 </a>
             </nav>
 
-            <div class="flex items-center gap-3">
+            <div class="flex items-center gap-2.5">
+                <div class="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-[11px] text-emerald-300 font-mono">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                    <span>MQTT 99.8%</span>
+                </div>
                 <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800/80 border border-slate-700/60 text-xs">
                     <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
                     <span class="text-slate-300 font-mono" id="reloj-vivo">--:--:--</span>
@@ -75,6 +88,14 @@
                     <i data-lucide="shield" class="w-4 h-4"></i>
                 </a>
             </div>
+        </div>
+        <!-- Navegación móvil -->
+        <div class="flex md:hidden overflow-x-auto border-t border-slate-800 px-3 py-2 gap-1.5 bg-slate-900/95">
+            <a href="{% url 'dashboard:index' %}" class="px-2.5 py-1 rounded-md text-xs whitespace-nowrap {% if request.resolver_match.url_name == 'index' %}bg-emerald-500/20 text-emerald-300 font-semibold{% else %}text-slate-400{% endif %}">En Vivo</a>
+            <a href="{% url 'dashboard:control_pid' %}" class="px-2.5 py-1 rounded-md text-xs whitespace-nowrap {% if request.resolver_match.url_name == 'control_pid' %}bg-emerald-500/20 text-emerald-300 font-semibold{% else %}text-slate-400{% endif %}">Control PID</a>
+            <a href="{% url 'dashboard:vision' %}" class="px-2.5 py-1 rounded-md text-xs whitespace-nowrap {% if request.resolver_match.url_name == 'vision' %}bg-emerald-500/20 text-emerald-300 font-semibold{% else %}text-slate-400{% endif %}">Visión YOLO</a>
+            <a href="{% url 'dashboard:gemelo_digital' %}" class="px-2.5 py-1 rounded-md text-xs whitespace-nowrap {% if request.resolver_match.url_name == 'gemelo_digital' %}bg-emerald-500/20 text-emerald-300 font-semibold{% else %}text-slate-400{% endif %}">Gemelo Digital</a>
+            <a href="{% url 'dashboard:experimentos' %}" class="px-2.5 py-1 rounded-md text-xs whitespace-nowrap {% if request.resolver_match.url_name == 'experimentos' %}bg-emerald-500/20 text-emerald-300 font-semibold{% else %}text-slate-400{% endif %}">Ensayos E1-E8</a>
         </div>
     </header>
 
@@ -85,14 +106,15 @@
 
     <!-- Footer -->
     <footer class="border-t border-slate-900 bg-slate-950 py-4 text-center text-xs text-slate-500">
-        <p>Prototipo de Tesis: Sistema Integrado IoT–PID–IA para la Regulación Microclimática y Detección de Plagas en Papa • La Paz, Bolivia</p>
+        <p>Prototipo de Tesis: Sistema Integrado IoT–PID–IA para la Regulación Microclimática y Detección Temprana de Plagas en el Cultivo de Papa bajo Invernadero • La Paz, Bolivia</p>
     </footer>
 
     <script>
         lucide.createIcons();
         function actualizarReloj() {
             const ahora = new Date();
-            document.getElementById('reloj-vivo').innerText = ahora.toLocaleTimeString();
+            const el = document.getElementById('reloj-vivo');
+            if (el) el.innerText = ahora.toLocaleTimeString();
         }
         setInterval(actualizarReloj, 1000);
         actualizarReloj();

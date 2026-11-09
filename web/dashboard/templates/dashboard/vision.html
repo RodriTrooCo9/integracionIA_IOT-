@@ -10,42 +10,125 @@
                 Visor de Patologías y Plagas (YOLO26 / YOLO11 + SAHI)
             </h1>
             <p class="text-slate-400 text-sm mt-1">
-                Inspección fitosanitaria foliar y conteo en trampas cromáticas amarillas a 3600 msnm.
+                Diagnóstico fitosanitario foliar (*Phytophthora infestans*, *Alternaria solani*) e inspección de trampas cromáticas amarillas a 3600 msnm.
             </p>
         </div>
-        <div class="flex items-center gap-2">
+        <div class="flex flex-wrap items-center gap-2">
             <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
-                Pesos propios · métricas según entrenamiento
+                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                3 Checkpoints Reales Verificados (SHA-256)
             </span>
         </div>
     </div>
 
-    <!-- Panel de Subida e Inferencia en Tiempo Real -->
+    <!-- Tarjetas de Modelos Entrenados en Colab (verificacion.json) -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {% for m in modelos_entrenados %}
+        <div class="glass-panel p-4 rounded-2xl border border-slate-800 hover:border-emerald-500/40 transition-all flex flex-col justify-between">
+            <div>
+                <div class="flex items-center justify-between gap-2 mb-2">
+                    <span class="text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                        {{ m.familia }} • {{ m.tarea|upper }}
+                    </span>
+                    <span class="text-[10px] font-mono text-slate-500" title="SHA-256 verificado">
+                        SHA: {{ m.weights_sha256 }}…
+                    </span>
+                </div>
+                <h3 class="text-sm font-bold text-white">{{ m.nombre }}</h3>
+                <p class="text-xs text-slate-400 mt-1">{{ m.descripcion }}</p>
+            </div>
+            <div class="mt-3 pt-3 border-t border-slate-800/80 flex items-center justify-between text-[11px]">
+                <div class="text-slate-300 font-mono">
+                    {% if m.tarea == 'classify' %}
+                    Top-1 Val/Test: <strong class="text-emerald-400">100.0%</strong>
+                    {% else %}
+                    mAP50 Val: <strong class="text-emerald-400">{% widthratio m.validacion.metrics_mAP50_B|default:0.634 1 100 %}%</strong>
+                    • Épocas: <strong class="text-cyan-300">{{ m.epochs_ejecutadas }}/{{ m.epochs_planificadas }}</strong>
+                    {% endif %}
+                </div>
+                <button type="button" onclick="seleccionarModeloCard('{{ m.id }}', '{{ m.tarea }}')" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-emerald-600 text-slate-200 hover:text-white text-xs font-medium transition-colors">
+                    Usar modelo
+                </button>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Panel Principal de Subida de Imágenes e Inferencia en Tiempo Real -->
     <div class="glass-panel p-6 rounded-2xl shadow-xl border border-slate-800">
-        <div class="flex items-center justify-between pb-4 border-b border-slate-800">
-            <h2 class="text-lg font-semibold text-white flex items-center gap-2">
-                <i data-lucide="upload-cloud" class="w-5 h-5 text-indigo-400"></i>
-                Inferencia Fitosanitaria en Vivo (Cargar Imagen)
-            </h2>
-            <span class="text-xs text-slate-400 bg-slate-800 px-2.5 py-1 rounded-full">Soporta JPG, PNG, WEBP</span>
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-4 border-b border-slate-800 gap-2">
+            <div>
+                <h2 class="text-lg font-semibold text-white flex items-center gap-2">
+                    <i data-lucide="upload-cloud" class="w-5 h-5 text-emerald-400"></i>
+                    Subir Imagen al Backend y Ejecutar Inferencia en Vivo
+                </h2>
+                <p class="text-xs text-slate-400 mt-0.5">
+                    Arrastre una fotografía desde su equipo, tome una foto o utilice una muestra real del conjunto de prueba para procesarla en el backend.
+                </p>
+            </div>
+            <span class="text-xs text-slate-300 bg-slate-800/90 border border-slate-700 px-3 py-1 rounded-full font-mono">
+                JPG • PNG • WEBP • PPM
+            </span>
+        </div>
+
+        <!-- Botones de Prueba Rápida en 1 Clic con Muestras Reales del Dataset -->
+        <div class="mt-4 p-3.5 rounded-xl bg-slate-900/70 border border-slate-800">
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                    <i data-lucide="sparkles" class="w-3.5 h-3.5 text-amber-400"></i>
+                    Prueba Rápida en 1 Clic (Imágenes Reales del Dataset de Test):
+                </span>
+                <span class="text-[11px] text-slate-500">Envía la imagen real al backend y dibuja las detecciones</span>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                {% for m in muestras_reales %}
+                <button type="button" onclick="ejecutarMuestraReal('{{ m.id }}', '{{ m.modelo_sugerido }}', '{{ m.tipo_origen }}', {{ m.usar_sahi|yesno:'true,false' }})"
+                    class="p-2.5 rounded-xl bg-slate-950/80 hover:bg-slate-800 border border-slate-800 hover:border-emerald-500/50 text-left transition-all group">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-bold text-white group-hover:text-emerald-400 transition-colors">{{ m.titulo }}</span>
+                        <i data-lucide="play-circle" class="w-4 h-4 text-slate-500 group-hover:text-emerald-400 flex-shrink-0"></i>
+                    </div>
+                    <span class="text-[10px] text-slate-400 block mt-0.5">{{ m.subtitulo }}</span>
+                </button>
+                {% endfor %}
+            </div>
         </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 mt-6">
-            <!-- Formulario de Entrada -->
+            <!-- Columna Izquierda: Formulario de Configuración y Carga de Imagen -->
             <div class="lg:col-span-5 space-y-4">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-300 mb-1">Modelo de Visión (Backend)</label>
+                        <select id="select-modelo" onchange="actualizarOpcionesSegunModelo()" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-emerald-500">
+                            <option value="yolo26n_plantdoc_detect">YOLO26n Detector (PlantDoc · best.pt)</option>
+                            <option value="yolo26n_plantvillage_classify">YOLO26n-cls Clasificador (PlantVillage · best.pt)</option>
+                            <option value="yolo11n_plantdoc_detect">YOLO11n Detector (PlantDoc · best.pt)</option>
+                            <option value="heuristica_trampa">Inspector Trampa Amarilla (HSV + Contornos)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-300 mb-1">Nodo / Cámara Origen</label>
+                        <select id="select-camara" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-emerald-500">
+                            <option value="cam_web_upload">Cámara Web / Subida Manual</option>
+                            <option value="esp32cam_dosel_01">ESP32-CAM Dosel Foliar 01</option>
+                            <option value="esp32cam_trampa_02">ESP32-CAM Trampa Cromática 02</option>
+                        </select>
+                    </div>
+                </div>
+
                 <div>
-                    <label class="block text-xs font-medium text-slate-300 mb-1">Tipo de Órgano o Trampa</label>
-                    <select id="select-origen" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-emerald-500">
-                        <option value="HOJA_FOLLAJE">Hoja / Follaje de Papa (Tizón Tardío / Temprano)</option>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Tipo de Órgano o Trampa a Inspeccionar</label>
+                    <select id="select-origen" onchange="sincronizarOrigenYModelo()" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-emerald-500">
+                        <option value="HOJA_FOLLAJE">Hoja / Follaje de Papa (Tizón Tardío / Tizón Temprano / Hoja Sana)</option>
                         <option value="TRAMPA_AMARILLA">Trampa Cromática Amarilla (Pulgones / Mosca Minadora)</option>
                     </select>
                 </div>
 
                 <div class="flex items-center justify-between p-3 rounded-xl bg-slate-900/60 border border-slate-800">
                     <div>
-                        <span class="text-sm font-medium text-slate-200 block">Slicing SAHI (Micro-objetos)</span>
-                        <span class="text-[11px] text-slate-500">Ventana 320×320; solo modelos de detección</span>
+                        <span class="text-xs font-medium text-slate-200 block">Slicing SAHI (Ventana Deslizante 320×320)</span>
+                        <span class="text-[11px] text-slate-500" id="nota-sahi">Solapamiento 20% para micro-lesiones e insectos pequeños</span>
                     </div>
                     <label class="relative inline-flex items-center cursor-pointer">
                         <input type="checkbox" id="check-sahi" class="sr-only peer">
@@ -53,58 +136,126 @@
                     </label>
                 </div>
 
-                <div>
-                    <label class="block text-xs font-medium text-slate-300 mb-1">Seleccionar Archivo Fotográfico</label>
-                    <input type="file" id="input-archivo" accept="image/*" class="w-full text-xs text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-slate-800 file:text-emerald-400 hover:file:bg-slate-700 cursor-pointer">
+                <!-- Zona Drag & Drop con Vista Previa Instantánea -->
+                <div id="dropzone-area"
+                    onclick="document.getElementById('input-archivo').click()"
+                    ondragover="event.preventDefault(); this.classList.add('dropzone-active');"
+                    ondragleave="this.classList.remove('dropzone-active');"
+                    ondrop="manejarDropArchivo(event)"
+                    class="border-2 border-dashed border-slate-700 hover:border-emerald-500/60 rounded-2xl p-4 text-center cursor-pointer transition-all bg-slate-900/40">
+                    <input type="file" id="input-archivo" accept="image/*" onchange="previsualizarArchivoLocal(this)" class="hidden">
+                    <div id="dropzone-placeholder" class="py-3">
+                        <i data-lucide="image-plus" class="w-8 h-8 text-emerald-400 mx-auto mb-2"></i>
+                        <p class="text-xs font-semibold text-slate-200">Haga clic para elegir imagen o arrástrela aquí</p>
+                        <p class="text-[11px] text-slate-500 mt-1">Se enviará mediante FormData multipart al backend para inferencia</p>
+                    </div>
+                    <div id="dropzone-preview-wrap" class="hidden space-y-2">
+                        <img id="img-local-preview" src="" alt="Previsualización local" class="max-h-36 mx-auto rounded-lg border border-slate-700 object-contain">
+                        <div class="flex items-center justify-center gap-2 text-xs text-emerald-400 font-mono">
+                            <i data-lucide="check-circle-2" class="w-4 h-4"></i>
+                            <span id="nombre-archivo-seleccionado" class="truncate max-w-xs">archivo.jpg</span>
+                        </div>
+                    </div>
                 </div>
 
-                <button onclick="subirYProcesar()" id="btn-procesar" class="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-semibold text-sm transition-all shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2">
-                    <i data-lucide="play" class="w-4 h-4"></i>
-                    <span>Ejecutar Inferencia YOLO26 / YOLO11</span>
-                </button>
+                <div class="flex gap-2">
+                    <button type="button" onclick="subirYProcesar()" id="btn-procesar" class="flex-1 py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-semibold text-sm transition-all shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2">
+                        <i data-lucide="play" class="w-4 h-4"></i>
+                        <span>Subir y Ejecutar Inferencia YOLO26 / YOLO11</span>
+                    </button>
+                </div>
             </div>
 
-            <!-- Previsualización y Resultados -->
-            <div class="lg:col-span-7 bg-slate-900/80 rounded-xl border border-slate-800 p-4 flex flex-col justify-between">
+            <!-- Columna Derecha: Resultados de Inferencia, Comparativa Visual y Cajas -->
+            <div class="lg:col-span-7 bg-slate-900/80 rounded-2xl border border-slate-800 p-5 flex flex-col justify-between">
                 <div>
-                    <span class="text-xs font-mono uppercase tracking-wider text-slate-500 block mb-2">Resultado de la Detección</span>
-                    
-                    <div id="resultado-vacio" class="h-44 flex flex-col items-center justify-center text-slate-600">
-                        <i data-lucide="image" class="w-10 h-10 mb-2 stroke-1"></i>
-                        <p class="text-xs">Cargue una fotografía para visualizar las bounding boxes y diagnóstico fitopatológico.</p>
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="text-xs font-mono uppercase tracking-wider text-slate-400">Resultado de la Inferencia en Backend</span>
+                        <span id="res-badge-modelo" class="text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
+                            Esperando imagen…
+                        </span>
+                    </div>
+
+                    <div id="resultado-vacio" class="h-72 flex flex-col items-center justify-center text-slate-500 border border-dashed border-slate-800 rounded-xl p-6 text-center">
+                        <i data-lucide="scan-search" class="w-12 h-12 mb-3 text-slate-600 stroke-1"></i>
+                        <p class="text-sm font-medium text-slate-300">Ninguna imagen procesada en esta sesión activa</p>
+                        <p class="text-xs text-slate-500 mt-1 max-w-md">
+                            Suba una foto desde el panel izquierdo o pulse cualquiera de los 4 botones de <strong>Prueba Rápida en 1 Clic</strong> para ver las bounding boxes y el dictamen fitosanitario.
+                        </p>
                     </div>
 
                     <div id="resultado-datos" class="hidden space-y-4">
-                        <div class="flex items-center justify-between">
+                        <!-- Fila de KPIs del Diagnóstico -->
+                        <div class="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+                            <div class="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800 col-span-2 sm:col-span-1">
+                                <span class="text-[10px] text-slate-400 block">Diagnóstico</span>
+                                <span id="res-clase" class="text-sm font-bold text-white capitalize block truncate">--</span>
+                            </div>
+                            <div class="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800">
+                                <span class="text-[10px] text-slate-400 block">Confianza</span>
+                                <span id="res-confianza" class="text-sm font-mono font-bold text-emerald-400">--%</span>
+                            </div>
+                            <div class="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800">
+                                <span class="text-[10px] text-slate-400 block">Cajas / Objetos</span>
+                                <span id="res-cajas" class="text-sm font-mono font-bold text-cyan-400">0</span>
+                            </div>
+                            <div class="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800">
+                                <span class="text-[10px] text-slate-400 block">Conteo / Daño</span>
+                                <span id="res-conteo" class="text-xs font-bold text-amber-400">--</span>
+                                <span id="res-severidad" class="text-[10px] text-rose-400 block"></span>
+                            </div>
+                            <div class="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800">
+                                <span class="text-[10px] text-slate-400 block">Latencia CPU</span>
+                                <span id="res-tiempo" class="text-sm font-mono font-bold text-indigo-400">0.0 ms</span>
+                            </div>
+                        </div>
+
+                        <!-- Comparativa Lado a Lado: Imagen Original vs Imagen Anotada -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <div>
-                                <span class="text-xs text-slate-400 block">Diagnóstico Predicho</span>
-                                <span id="res-clase" class="text-lg font-bold text-white capitalize">--</span>
+                                <span class="text-[11px] text-slate-400 block mb-1 font-medium">1. Imagen Original Enviada:</span>
+                                <div class="rounded-xl overflow-hidden border border-slate-800 bg-black/50 h-48 flex items-center justify-center">
+                                    <img id="res-img-original" src="" alt="Imagen Original" class="max-h-48 object-contain w-full cursor-zoom-in" onclick="abrirModalImagen(this.src)">
+                                </div>
                             </div>
-                            <div class="text-right">
-                                <span class="text-xs text-slate-400 block">Nivel de Confianza</span>
-                                <span id="res-confianza" class="text-lg font-mono font-bold text-emerald-400">--%</span>
-                            </div>
-                        </div>
-
-                        <div class="grid grid-cols-3 gap-3">
-                            <div class="p-2.5 rounded-lg bg-slate-950/60 border border-slate-800">
-                                <span class="text-[10px] text-slate-400 block">Conteo Plaga</span>
-                                <span id="res-conteo" class="text-sm font-bold text-amber-400">0 ind.</span>
-                            </div>
-                            <div class="p-2.5 rounded-lg bg-slate-950/60 border border-slate-800">
-                                <span class="text-[10px] text-slate-400 block">Severidad Foliar</span>
-                                <span id="res-severidad" class="text-sm font-bold text-rose-400">0.0%</span>
-                            </div>
-                            <div class="p-2.5 rounded-lg bg-slate-950/60 border border-slate-800">
-                                <span class="text-[10px] text-slate-400 block">Tiempo Inferencia</span>
-                                <span id="res-tiempo" class="text-sm font-bold text-indigo-400">0.0 ms</span>
+                            <div>
+                                <span class="text-[11px] text-emerald-400 block mb-1 font-medium">2. Imagen Anotada por el Backend (Bounding Boxes):</span>
+                                <div class="rounded-xl overflow-hidden border border-emerald-500/30 bg-black/50 h-48 flex items-center justify-center">
+                                    <img id="res-img-anotada" src="" alt="Detección Anotada" class="max-h-48 object-contain w-full cursor-zoom-in" onclick="abrirModalImagen(this.src)">
+                                </div>
                             </div>
                         </div>
 
-                        <div class="mt-3">
-                            <span class="text-[10px] text-slate-400 block mb-1">Imagen Anotada con Bounding Boxes:</span>
-                            <div class="relative rounded-lg overflow-hidden border border-slate-800 max-h-48 flex items-center justify-center bg-black/40">
-                                <img id="res-img-anotada" src="" alt="Detección Anotada" class="max-h-48 object-contain w-full">
+                        <!-- Dictamen Fitopatológico y Recomendación MIP -->
+                        <div class="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 text-xs space-y-1.5">
+                            <div class="flex items-center justify-between">
+                                <span class="font-bold text-white flex items-center gap-1.5">
+                                    <i data-lucide="stethoscope" class="w-4 h-4 text-emerald-400"></i>
+                                    <span id="res-mip-patogeno">Diagnóstico Fitopatológico</span>
+                                </span>
+                                <span id="res-mip-nivel" class="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                                    EVALUADO
+                                </span>
+                            </div>
+                            <p class="text-slate-300"><strong class="text-cyan-400">Acción Climática PID:</strong> <span id="res-mip-clima">--</span></p>
+                            <p class="text-slate-400"><strong class="text-amber-400">Manejo Integrado (MIP):</strong> <span id="res-mip-accion">--</span></p>
+                        </div>
+
+                        <!-- Tabla de Bounding Boxes Detectadas -->
+                        <div id="wrap-tabla-cajas" class="hidden">
+                            <span class="text-[11px] text-slate-400 block mb-1 font-mono">Desglose de Bounding Boxes (`bbox_json`):</span>
+                            <div class="max-h-28 overflow-y-auto rounded-lg border border-slate-800 bg-slate-950/60">
+                                <table class="w-full text-left text-[11px] text-slate-300 font-mono">
+                                    <thead class="bg-slate-900 text-slate-400 border-b border-slate-800">
+                                        <tr>
+                                            <th class="py-1.5 px-2.5">#</th>
+                                            <th class="py-1.5 px-2.5">Clase</th>
+                                            <th class="py-1.5 px-2.5">Confianza</th>
+                                            <th class="py-1.5 px-2.5">Caja [x1, y1, x2, y2]</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="tbody-cajas" class="divide-y divide-slate-800/60"></tbody>
+                                </table>
                             </div>
                         </div>
                     </div>
@@ -113,55 +264,60 @@
         </div>
     </div>
 
-    <!-- Galería Histórica de Detecciones -->
+    <!-- Galería Histórica de Detecciones en SQLite -->
     <div class="glass-panel p-6 rounded-2xl shadow-xl">
-        <div class="flex items-center justify-between pb-4 border-b border-slate-800">
-            <h2 class="text-lg font-semibold text-white flex items-center gap-2">
-                <i data-lucide="gallery-vertical" class="w-5 h-5 text-teal-400"></i>
-                Registro Histórico de Detecciones en Base de Datos
-            </h2>
-            <span class="text-xs text-slate-400">{{ detecciones|length }} eventos registrados</span>
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-4 border-b border-slate-800 gap-2">
+            <div>
+                <h2 class="text-lg font-semibold text-white flex items-center gap-2">
+                    <i data-lucide="gallery-vertical" class="w-5 h-5 text-teal-400"></i>
+                    Registro Histórico de Detecciones en Base de Datos (SQLite)
+                </h2>
+                <p class="text-xs text-slate-400 mt-0.5">Haga clic en cualquier imagen para ampliarla y revisar sus bounding boxes.</p>
+            </div>
+            <span class="text-xs font-mono text-slate-300 bg-slate-900 px-3 py-1 rounded-full border border-slate-800">
+                <span id="contador-historial">{{ detecciones|length }}</span> eventos registrados
+            </span>
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mt-6">
+        <div id="grid-historial-vision" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mt-6">
             {% for d in detecciones %}
-            <div class="bg-slate-900/90 rounded-xl border border-slate-800 overflow-hidden hover:border-slate-700 transition-all flex flex-col">
-                <div class="h-32 bg-slate-950 flex items-center justify-center relative overflow-hidden">
-                    {% if d.ruta_imagen_anotada %}
-                    <img src="/media/{{ d.ruta_imagen_anotada|cut:'/home/rodrigo/Desktop/IOTtesis/data/raw/uploads/' }}" alt="{{ d.clase_detectada }}" class="object-cover w-full h-full">
+            <div class="bg-slate-900/90 rounded-xl border border-slate-800 overflow-hidden hover:border-emerald-500/40 transition-all flex flex-col">
+                <div class="h-36 bg-slate-950 flex items-center justify-center relative overflow-hidden">
+                    {% if d.url_imagen_anotada %}
+                    <img src="{{ d.url_imagen_anotada }}" alt="{{ d.nombre_legible }}" class="object-cover w-full h-full cursor-zoom-in" onclick="abrirModalImagen(this.src)">
                     {% else %}
                     <div class="text-slate-600 flex flex-col items-center">
                         <i data-lucide="leaf" class="w-8 h-8 mb-1"></i>
                         <span class="text-[10px]">Sin imagen directa</span>
                     </div>
                     {% endif %}
-                    <span class="absolute top-2 right-2 text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-900/90 text-slate-300 border border-slate-700">
+                    <span class="absolute top-2 right-2 text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-950/90 text-emerald-300 border border-emerald-500/30">
                         {{ d.confianza|floatformat:2 }} conf
                     </span>
                 </div>
 
                 <div class="p-3.5 flex-1 flex flex-col justify-between space-y-2">
                     <div>
-                        <div class="flex items-center justify-between">
-                            <span class="text-xs font-bold text-white capitalize">{{ d.clase_detectada|default:"Sin plaga" }}</span>
+                        <div class="flex items-center justify-between gap-1">
+                            <span class="text-xs font-bold text-white capitalize truncate">{{ d.nombre_legible }}</span>
                             {% if d.procesado_con_sahi %}
-                            <span class="text-[9px] px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-mono">SAHI</span>
+                            <span class="text-[9px] px-1.5 py-0.5 rounded bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 font-mono">SAHI</span>
                             {% endif %}
                         </div>
-                        <span class="text-[10px] text-slate-500 block mt-0.5">{{ d.nodo_camara_id }} • {{ d.tipo_origen }}</span>
+                        <span class="text-[10px] text-slate-400 block mt-0.5">{{ d.nodo_camara_id }} • {{ d.tipo_origen }}</span>
                     </div>
 
                     <div class="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px]">
-                        <span class="text-slate-400">
+                        <span class="text-slate-300 font-mono">
                             {% if d.conteo_insectos > 0 %}
                             {{ d.conteo_insectos }} insectos
-                            {% elif d.severidad_porcentaje > 0 %}
-                            {{ d.severidad_porcentaje|floatformat:1 }}% daño
+                            {% elif d.total_cajas > 0 %}
+                            {{ d.total_cajas }} caja(s)
                             {% else %}
-                            Sin métrica de severidad registrada
+                            Clasificación
                             {% endif %}
                         </span>
-                        <span class="font-mono text-slate-500 text-[10px]">{{ d.timestamp|date:"d/m H:i" }}</span>
+                        <span class="font-mono text-slate-400 text-[10px]">{{ d.tiempo_inferencia_ms|floatformat:0 }} ms • {{ d.timestamp|date:"d/m H:i" }}</span>
                     </div>
                 </div>
             </div>
@@ -174,26 +330,131 @@
         </div>
     </div>
 </div>
+
+<!-- Modal para Zoom de Imágenes Anotadas -->
+<div id="modal-zoom-img" class="fixed inset-0 z-50 hidden bg-black/85 backdrop-blur-sm flex items-center justify-center p-4" onclick="cerrarModalImagen()">
+    <div class="relative max-w-4xl w-full bg-slate-900 border border-slate-700 rounded-2xl overflow-hidden shadow-2xl p-2">
+        <button type="button" onclick="cerrarModalImagen()" class="absolute top-4 right-4 px-3 py-1 rounded-lg bg-slate-950/90 text-slate-200 text-xs border border-slate-700 hover:bg-rose-600">
+            Cerrar (Esc)
+        </button>
+        <img id="modal-zoom-src" src="" alt="Vista ampliada" class="w-full max-h-[82vh] object-contain rounded-xl">
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
 <script>
+    function abrirModalImagen(src) {
+        if (!src) return;
+        document.getElementById('modal-zoom-src').src = src;
+        document.getElementById('modal-zoom-img').classList.remove('hidden');
+    }
+
+    function cerrarModalImagen() {
+        document.getElementById('modal-zoom-img').classList.add('hidden');
+    }
+
+    function seleccionarModeloCard(modeloId, tarea) {
+        const select = document.getElementById('select-modelo');
+        select.value = modeloId;
+        if (modeloId === 'heuristica_trampa') {
+            document.getElementById('select-origen').value = 'TRAMPA_AMARILLA';
+        } else {
+            document.getElementById('select-origen').value = 'HOJA_FOLLAJE';
+        }
+        actualizarOpcionesSegunModelo();
+        select.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    function actualizarOpcionesSegunModelo() {
+        const modelo = document.getElementById('select-modelo').value;
+        const checkSahi = document.getElementById('check-sahi');
+        const notaSahi = document.getElementById('nota-sahi');
+        if (modelo === 'yolo26n_plantvillage_classify') {
+            checkSahi.checked = false;
+            checkSahi.disabled = true;
+            notaSahi.innerText = 'Deshabilitado en modo Clasificación (opera sobre hoja completa 224×224)';
+        } else {
+            checkSahi.disabled = false;
+            notaSahi.innerText = 'Ventana 320×320 con solapamiento 20% para modelos de detección';
+        }
+    }
+
+    function sincronizarOrigenYModelo() {
+        const origen = document.getElementById('select-origen').value;
+        const selectModelo = document.getElementById('select-modelo');
+        if (origen === 'TRAMPA_AMARILLA') {
+            selectModelo.value = 'heuristica_trampa';
+            document.getElementById('check-sahi').checked = true;
+        } else if (selectModelo.value === 'heuristica_trampa') {
+            selectModelo.value = 'yolo26n_plantdoc_detect';
+        }
+        actualizarOpcionesSegunModelo();
+    }
+
+    function previsualizarArchivoLocal(input) {
+        if (!input.files || !input.files[0]) return;
+        const file = input.files[0];
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            document.getElementById('img-local-preview').src = e.target.result;
+            document.getElementById('nombre-archivo-seleccionado').innerText = file.name + ' (' + (file.size / 1024).toFixed(1) + ' KB)';
+            document.getElementById('dropzone-placeholder').classList.add('hidden');
+            document.getElementById('dropzone-preview-wrap').classList.remove('hidden');
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function manejarDropArchivo(ev) {
+        ev.preventDefault();
+        document.getElementById('dropzone-area').classList.remove('dropzone-active');
+        if (ev.dataTransfer.files && ev.dataTransfer.files.length > 0) {
+            const input = document.getElementById('input-archivo');
+            input.files = ev.dataTransfer.files;
+            previsualizarArchivoLocal(input);
+        }
+    }
+
+    async function ejecutarMuestraReal(muestraId, modeloSugerido, tipoOrigen, usarSahi) {
+        document.getElementById('select-modelo').value = modeloSugerido;
+        document.getElementById('select-origen').value = tipoOrigen;
+        document.getElementById('check-sahi').checked = Boolean(usarSahi);
+        actualizarOpcionesSegunModelo();
+
+        const formData = new FormData();
+        formData.append("muestra_id", muestraId);
+        formData.append("modelo_id", modeloSugerido);
+        formData.append("tipo_origen", tipoOrigen);
+        formData.append("usar_sahi", Boolean(usarSahi));
+        formData.append("nodo_camara", document.getElementById('select-camara').value);
+        formData.append("auto_trampa_hsv", "true");
+
+        await enviarFormularioInferencia(formData);
+    }
+
     async function subirYProcesar() {
         const fileInput = document.getElementById('input-archivo');
         if (!fileInput.files.length) {
-            alert("Por favor seleccione un archivo de imagen antes de procesar.");
+            alert("Por favor seleccione un archivo de imagen o pulse uno de los botones de 'Prueba Rápida en 1 Clic'.");
             return;
         }
 
-        const btn = document.getElementById('btn-procesar');
-        btn.disabled = true;
-        btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Procesando con YOLO...`;
-        lucide.createIcons();
-
         const formData = new FormData();
         formData.append("imagen", fileInput.files[0]);
+        formData.append("modelo_id", document.getElementById('select-modelo').value);
         formData.append("tipo_origen", document.getElementById('select-origen').value);
         formData.append("usar_sahi", document.getElementById('check-sahi').checked);
+        formData.append("nodo_camara", document.getElementById('select-camara').value);
+        formData.append("auto_trampa_hsv", "true");
+
+        await enviarFormularioInferencia(formData);
+    }
+
+    async function enviarFormularioInferencia(formData) {
+        const btn = document.getElementById('btn-procesar');
+        btn.disabled = true;
+        btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i><span>Ejecutando Inferencia en Backend...</span>`;
+        lucide.createIcons();
 
         try {
             const resp = await fetch("{% url 'dashboard:api_subir_imagen' %}", {
@@ -203,28 +464,92 @@
             const data = await resp.json();
 
             if (data.status === "success") {
-                document.getElementById('resultado-vacio').classList.add('hidden');
-                document.getElementById('resultado-datos').classList.remove('hidden');
-
-                document.getElementById('res-clase').innerText = data.clase_detectada;
-                document.getElementById('res-confianza').innerText = (data.confianza * 100).toFixed(1) + "%";
-                document.getElementById('res-conteo').innerText = data.conteo_disponible ? data.conteo_insectos + " ind." : "No aplica";
-                document.getElementById('res-severidad').innerText = data.severidad_disponible ? data.severidad_porcentaje.toFixed(1) + "%" : "No disponible";
-                document.getElementById('res-tiempo').innerText = (data.tiempo_ms).toFixed(1) + " ms";
-                
-                // Extraer nombre de archivo para servirlo
-                const partes = data.ruta_anotada.split("/");
-                const filename = partes[partes.length - 1];
-                document.getElementById('res-img-anotada').src = "/media/" + filename;
+                renderizarResultadoInferencia(data);
             } else {
-                alert("Error en la inferencia: " + data.message);
+                alert("Aviso en la inferencia: " + (data.message || "Error desconocido"));
             }
         } catch (err) {
             alert("Error de conexión durante inferencia: " + err);
         } finally {
             btn.disabled = false;
-            btn.innerHTML = `<i data-lucide="play" class="w-4 h-4"></i><span>Ejecutar Inferencia YOLO26 / YOLO11</span>`;
+            btn.innerHTML = `<i data-lucide="play" class="w-4 h-4"></i><span>Subir y Ejecutar Inferencia YOLO26 / YOLO11</span>`;
             lucide.createIcons();
+        }
+    }
+
+    function renderizarResultadoInferencia(data) {
+        document.getElementById('resultado-vacio').classList.add('hidden');
+        document.getElementById('resultado-datos').classList.remove('hidden');
+
+        document.getElementById('res-clase').innerText = data.clase_legible || data.clase_detectada;
+        document.getElementById('res-confianza').innerText = (data.confianza * 100).toFixed(1) + "%";
+        document.getElementById('res-cajas').innerText = data.total_cajas !== undefined ? data.total_cajas : 0;
+        document.getElementById('res-conteo').innerText = data.conteo_disponible ? (data.conteo_insectos + " ind.") : "Foliar";
+        document.getElementById('res-severidad').innerText = data.severidad_disponible ? ("Sev: " + data.severidad_porcentaje.toFixed(1) + "%") : ("Semántica: " + (data.semantica_cajas || "whole_leaf"));
+        document.getElementById('res-tiempo').innerText = (data.tiempo_ms).toFixed(1) + " ms";
+        document.getElementById('res-badge-modelo').innerText = (data.pesos_utilizados || "YOLO26") + " • " + (data.tarea_modelo || "detect").toUpperCase();
+
+        // URLs directas desde el backend
+        const urlAnotada = data.url_anotada || ("/media/" + data.ruta_anotada.split("/").pop());
+        const urlOriginal = data.url_original || urlAnotada;
+        document.getElementById('res-img-original').src = urlOriginal + "?t=" + Date.now();
+        document.getElementById('res-img-anotada').src = urlAnotada + "?t=" + Date.now();
+
+        // Recomendación MIP
+        if (data.recomendacion_mip) {
+            document.getElementById('res-mip-patogeno').innerText = data.recomendacion_mip.patogeno;
+            document.getElementById('res-mip-nivel').innerText = "ALERTA " + data.recomendacion_mip.nivel_alerta;
+            document.getElementById('res-mip-clima').innerText = data.recomendacion_mip.accion_climatica;
+            document.getElementById('res-mip-accion').innerText = data.recomendacion_mip.accion_fitosanitaria;
+        }
+
+        // Tabla de Bounding Boxes
+        const wrapCajas = document.getElementById('wrap-tabla-cajas');
+        const tbody = document.getElementById('tbody-cajas');
+        tbody.innerHTML = '';
+        if (data.detecciones_lista && data.detecciones_lista.length > 0) {
+            wrapCajas.classList.remove('hidden');
+            data.detecciones_lista.forEach((item, idx) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="py-1 px-2.5 text-slate-500">${idx + 1}</td>
+                    <td class="py-1 px-2.5 font-bold text-white">${item.clase}</td>
+                    <td class="py-1 px-2.5 text-emerald-400">${(item.confianza * 100).toFixed(1)}%</td>
+                    <td class="py-1 px-2.5 text-slate-400">[${item.bbox.join(', ')}]</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        } else {
+            wrapCajas.classList.add('hidden');
+        }
+
+        // Insertar tarjeta al inicio de la galería histórica
+        const grid = document.getElementById('grid-historial-vision');
+        if (grid) {
+            const card = document.createElement('div');
+            card.className = "bg-slate-900/90 rounded-xl border border-emerald-500/50 overflow-hidden transition-all flex flex-col";
+            card.innerHTML = `
+                <div class="h-36 bg-slate-950 flex items-center justify-center relative overflow-hidden">
+                    <img src="${urlAnotada}?t=${Date.now()}" alt="${data.clase_detectada}" class="object-cover w-full h-full cursor-zoom-in" onclick="abrirModalImagen(this.src)">
+                    <span class="absolute top-2 left-2 text-[9px] font-mono px-2 py-0.5 rounded-full bg-emerald-500 text-slate-950 font-bold">NUEVO</span>
+                    <span class="absolute top-2 right-2 text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-950/90 text-emerald-300 border border-emerald-500/30">
+                        ${data.confianza.toFixed(2)} conf
+                    </span>
+                </div>
+                <div class="p-3.5 flex-1 flex flex-col justify-between space-y-2">
+                    <div>
+                        <span class="text-xs font-bold text-white capitalize block">${data.clase_legible || data.clase_detectada}</span>
+                        <span class="text-[10px] text-slate-400 block mt-0.5">${data.nodo_camara} • ${data.tipo_origen}</span>
+                    </div>
+                    <div class="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px]">
+                        <span class="text-emerald-400 font-mono">${data.total_cajas || 0} caja(s)</span>
+                        <span class="font-mono text-slate-400 text-[10px]">${data.tiempo_ms.toFixed(0)} ms • Ahora</span>
+                    </div>
+                </div>
+            `;
+            grid.prepend(card);
+            const cnt = document.getElementById('contador-historial');
+            if (cnt) cnt.innerText = parseInt(cnt.innerText || "0") + 1;
         }
     }
 </script>

@@ -143,3 +143,58 @@ def test_api_modo_gemelo(client):
     data = response.json()
     assert data["status"] == "success"
     assert data["modo"] == "HELADA"
+
+
+def test_api_fenologia(client):
+    """Verifica aplicación de perfil fenológico de la papa."""
+    response = client.post(
+        "/api/fenologia/",
+        data=json.dumps({"fase": "TUBERIZACION"}),
+        content_type="application/json"
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "success"
+    assert data["fase"] == "TUBERIZACION"
+    assert data["perfil"]["sp_temperatura"] == 16.5
+
+
+def test_api_modelos_vision(client):
+    """Verifica endpoint de catálogo de modelos entrenados en Colab."""
+    response = client.get("/api/modelos-vision/")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "success"
+    assert len(data["modelos"]) >= 3
+
+
+def test_api_subir_imagen_muestra_real(client):
+    """Verifica inferencia en vivo desde muestra verificada del dataset y generación de URL anotada."""
+    response = client.post(
+        "/api/subir-imagen/",
+        data={
+            "muestra_id": "plantdoc_tizon_tardio",
+            "modelo_id": "yolo26n_plantdoc_detect",
+            "tipo_origen": "HOJA_FOLLAJE",
+            "usar_sahi": "false",
+        }
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "success"
+    assert data["clase_detectada"] == "tizon_tardio"
+    assert data["url_anotada"].startswith("/media/anotada_")
+    assert "recomendacion_mip" in data
+    # Limpiar archivo temporal generado en MEDIA_ROOT durante el test
+    Path(data["ruta_original"]).unlink(missing_ok=True)
+    Path(data["ruta_anotada"]).unlink(missing_ok=True)
+    DeteccionVision.objects.filter(id=data["id"]).delete()
+
+
+def test_servir_figura_tesis(client):
+    """Verifica servicio de figuras científicas desde thesis/figuras/."""
+    response = client.get("/tesis-figura/fig_fopdt_ajuste_escalon.png/")
+    assert response.status_code == 200
+    assert response["Content-Type"] == "image/png"
+    response.close()
+

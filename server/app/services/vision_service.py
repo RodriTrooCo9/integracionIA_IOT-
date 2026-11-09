@@ -115,8 +115,13 @@ class VisionInferenceService:
                     raise ValueError('El checkpoint no produjo probabilidades de clasificación')
                 dominant = self.class_names[int(result.probs.top1)]
                 confidence = float(result.probs.top1conf.item())
-                cv2.putText(image, f'{dominant} {confidence:.2f}', (10, 25),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 200, 0), 2)
+                # Banner superior legible para clasificación foliar
+                overlay = image.copy()
+                cv2.rectangle(overlay, (0, 0), (width, min(42, height)), (15, 23, 42), -1)
+                cv2.addWeighted(overlay, 0.78, image, 0.22, 0, image)
+                color_cls = (34, 197, 94) if dominant == 'hoja_sana' else (59, 130, 246) if dominant == 'tizon_temprano' else (68, 68, 239)
+                cv2.putText(image, f'CLS: {dominant} ({confidence*100:.1f}%)', (10, 27),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.65, color_cls, 2)
             else:
                 relevant_classes = INSECTOS if is_trap else FOLIARES
                 if not set(self.class_names.values()) & relevant_classes:
@@ -154,12 +159,23 @@ class VisionInferenceService:
                     confidences.append(probability)
                     if name in LESIONES and self.box_semantics == 'lesion':
                         lesion_mask[y1:y2, x1:x2] = 255
-                    cv2.rectangle(image, (x1, y1), (x2 - 1, y2 - 1), (0, 0, 255) if name in LESIONES else (0, 200, 0), 2)
-                    cv2.putText(image, f'{name} {probability:.2f}', (x1, max(15, y1 - 5)),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 200, 0), 1)
+                    color_box = (0, 0, 255) if name in LESIONES else (0, 200, 0)
+                    cv2.rectangle(image, (x1, y1), (x2 - 1, y2 - 1), color_box, 2)
+                    label_txt = f'{name} {probability*100:.1f}%'
+                    (tw, th), _ = cv2.getTextSize(label_txt, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)
+                    y_lbl = max(th + 6, y1)
+                    cv2.rectangle(image, (x1, y_lbl - th - 6), (min(width, x1 + tw + 8), y_lbl), color_box, -1)
+                    cv2.putText(image, label_txt, (x1 + 4, y_lbl - 4),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
                 names = [b['clase'] for b in annotations]
                 dominant = Counter(names).most_common(1)[0][0] if names else 'sin_deteccion'
                 confidence = float(np.mean(confidences)) if confidences else 0.0
+                if not annotations:
+                    overlay = image.copy()
+                    cv2.rectangle(overlay, (0, 0), (width, min(38, height)), (15, 23, 42), -1)
+                    cv2.addWeighted(overlay, 0.75, image, 0.25, 0, image)
+                    cv2.putText(image, 'DET: sin_deteccion (conf >= 0.25)', (10, 24),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.55, (148, 163, 184), 1)
                 severity_available = not is_trap and self.box_semantics == 'lesion' and bool(set(self.class_names.values()) & LESIONES)
                 count_available = is_trap
         output = image_path.with_name('anotada_' + image_path.name)
@@ -168,6 +184,7 @@ class VisionInferenceService:
         return {
             'clase_detectada': dominant, 'confianza': round(confidence, 3),
             'bbox_json': json.dumps(annotations),
+            'total_cajas': len(annotations),
             # Legacy numeric fields remain serializable; validity flags distinguish 0 from N/A.
             'conteo_insectos': sum(a['clase'] in INSECTOS for a in annotations) if count_available else 0,
             'severidad_porcentaje': round(float(np.mean(lesion_mask > 0) * 100), 2) if severity_available else 0.0,
@@ -180,7 +197,156 @@ class VisionInferenceService:
             'tiempo_inferencia_ms': round((time.perf_counter() - start) * 1000, 2),
             'procesado_con_sahi': bool(use_sahi),
             'ruta_imagen_original': str(image_path), 'ruta_imagen_anotada': str(output),
+            'pesos_utilizados': self.weights_path.parent.parent.name if self.weights_path.name == 'best.pt' else self.weights_path.name,
         }
+
+
+CATALOGO_MODELOS_COLAB = {
+    'yolo26n_plantdoc_detect': {
+        'id': 'yolo26n_plantdoc_detect',
+        'nombre': 'YOLO26n Detector Foliar (PlantDoc)',
+        'familia': 'YOLO26',
+        'tarea': 'detect',
+        'weights_path': BASE_DIR / 'data' / 'models' / 'entrenados_colab' / 'yolo26n_plantdoc_detect' / 'weights' / 'best.pt',
+        'descripcion': 'Detector seleccionado por validación (mAP50=63.4%, mAP50-95=47.0%). Localiza hojas con Tizón Tardío y Tizón Temprano.',
+    },
+    'yolo26n_plantvillage_classify': {
+        'id': 'yolo26n_plantvillage_classify',
+        'nombre': 'YOLO26n-cls Clasificador Foliar (PlantVillage)',
+        'familia': 'YOLO26',
+        'tarea': 'classify',
+        'weights_path': BASE_DIR / 'data' / 'models' / 'entrenados_colab' / 'yolo26n_plantvillage_classify' / 'weights' / 'best.pt',
+        'descripcion': 'Clasificador de hoja individual en 3 clases (hoja_sana, tizon_tardio, tizon_temprano). Exactitud Top-1 en test: 100.0%.',
+    },
+    'yolo11n_plantdoc_detect': {
+        'id': 'yolo11n_plantdoc_detect',
+        'nombre': 'YOLO11n Detector Comparativo (PlantDoc)',
+        'familia': 'YOLO11',
+        'tarea': 'detect',
+        'weights_path': BASE_DIR / 'data' / 'models' / 'entrenados_colab' / 'yolo11n_plantdoc_detect' / 'weights' / 'best.pt',
+        'descripcion': 'Detector comparativo entrenado en igualdad de condiciones (mAP50=59.2%, mAP50-95=39.8%).',
+    },
+}
+
+_SERVICIOS_CACHE = {}
+_CACHE_LOCK = threading.RLock()
+
+
+def obtener_servicio_modelo(modelo_id: str = None) -> VisionInferenceService:
+    """Devuelve la instancia de VisionInferenceService para el modelo solicitado."""
+    if not modelo_id or modelo_id == 'default':
+        return vision_service
+    info = CATALOGO_MODELOS_COLAB.get(modelo_id)
+    if not info:
+        return vision_service
+    with _CACHE_LOCK:
+        if modelo_id not in _SERVICIOS_CACHE:
+            _SERVICIOS_CACHE[modelo_id] = VisionInferenceService(info['weights_path'])
+        return _SERVICIOS_CACHE[modelo_id]
+
+
+def obtener_resumen_modelos_entrenados():
+    """Lee verificacion.json y combina el estado real de los checkpoints entrenados."""
+    verif_path = BASE_DIR / 'data' / 'models' / 'entrenados_colab' / 'verificacion.json'
+    verif_data = {}
+    if verif_path.is_file():
+        try:
+            verif_data = json.loads(verif_path.read_text(encoding='utf-8'))
+        except Exception:
+            verif_data = {}
+    modelos_verif = {m.get('run'): m for m in verif_data.get('models', [])}
+    salida = []
+    for key, info in CATALOGO_MODELOS_COLAB.items():
+        v = modelos_verif.get(key, {})
+        w_path = Path(info['weights_path'])
+        salida.append({
+            'id': key,
+            'nombre': info['nombre'],
+            'familia': info['familia'],
+            'tarea': info['tarea'],
+            'descripcion': info['descripcion'],
+            'disponible': w_path.is_file(),
+            'weights_path': str(w_path),
+            'weights_sha256': v.get('weights_sha256', '')[:16],
+            'clases': list((v.get('names') or {}).values()),
+            'epochs_ejecutadas': v.get('epochs_csv'),
+            'epochs_planificadas': v.get('epochs_planned'),
+            'validacion': v.get('validation') or {},
+            'test': v.get('test') or {},
+            'dataset_counts': v.get('dataset_split_counts') or {},
+        })
+    return salida
+
+
+def procesar_trampa_amarilla_colorimetria(ruta_imagen, usar_sahi=True):
+    """
+    Inspección auxiliar por segmentación morfocromática HSV para trampas amarillas
+    (dado que los pilotos públicos PlantDoc/PlantVillage solo contienen clases foliares).
+    Marca explícitamente simulado=True y tarea_modelo='colorimetria_hsv_trampa'.
+    """
+    start = time.perf_counter()
+    image_path = Path(ruta_imagen)
+    image = cv2.imread(str(image_path))
+    if image is None:
+        raise ValueError('No se pudo decodificar la imagen')
+    height, width = image.shape[:2]
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    blur = cv2.GaussianBlur(gray, (5, 5), 0)
+    # Detectar micro-objetos oscuros sobre fondo claro/amarillo
+    thresh = cv2.adaptiveThreshold(blur, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+                                   cv2.THRESH_BINARY_INV, 21, 8)
+    contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    annotations = []
+    confidences = []
+    area_min = max(12, int((height * width) * 0.00005))
+    area_max = int((height * width) * 0.03)
+    for cnt in contours:
+        area = cv2.contourArea(cnt)
+        if area_min <= area <= area_max:
+            x, y, w_box, h_box = cv2.boundingRect(cnt)
+            aspect = w_box / float(max(1, h_box))
+            if 0.25 <= aspect <= 4.0:
+                clase_ins = 'pulgon' if area < (area_min * 8) else 'mosca_minadora'
+                conf = round(min(0.92, 0.58 + (area / max(1.0, float(area_max))) * 0.35), 3)
+                x1, y1, x2, y2 = x, y, x + w_box, y + h_box
+                annotations.append({'clase': clase_ins, 'confianza': conf, 'bbox': [x1, y1, x2, y2]})
+                confidences.append(conf)
+                color_c = (0, 165, 255) if clase_ins == 'pulgon' else (255, 191, 0)
+                cv2.rectangle(image, (x1, y1), (x2, y2), color_c, 2)
+                cv2.putText(image, f'{clase_ins} {conf:.2f}', (x1, max(12, y1 - 4)),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.42, color_c, 1)
+                if len(annotations) >= 35:
+                    break
+    overlay = image.copy()
+    cv2.rectangle(overlay, (0, 0), (width, min(38, height)), (15, 23, 42), -1)
+    cv2.addWeighted(overlay, 0.78, image, 0.22, 0, image)
+    cv2.putText(image, f'TRAMPA HSV (Auxiliar): {len(annotations)} individuos', (10, 24),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.55, (56, 189, 248), 2)
+    output = image_path.with_name('anotada_' + image_path.name)
+    cv2.imwrite(str(output), image)
+    names = [b['clase'] for b in annotations]
+    dominant = Counter(names).most_common(1)[0][0] if names else 'sin_deteccion'
+    confidence = float(np.mean(confidences)) if confidences else 0.0
+    return {
+        'clase_detectada': dominant,
+        'confianza': round(confidence, 3),
+        'bbox_json': json.dumps(annotations),
+        'total_cajas': len(annotations),
+        'conteo_insectos': len(annotations),
+        'severidad_porcentaje': 0.0,
+        'severidad_disponible': False,
+        'conteo_disponible': True,
+        'metrica_severidad': 'no_disponible',
+        'apto_supervision': False,
+        'simulado': True,
+        'tarea_modelo': 'colorimetria_hsv_trampa',
+        'semantica_cajas': 'contorno_cromotropico',
+        'tiempo_inferencia_ms': round((time.perf_counter() - start) * 1000, 2),
+        'procesado_con_sahi': bool(usar_sahi),
+        'ruta_imagen_original': str(image_path),
+        'ruta_imagen_anotada': str(output),
+        'pesos_utilizados': 'heuristica_hsv_trampa_amarilla',
+    }
 
 
 vision_service = VisionInferenceService()

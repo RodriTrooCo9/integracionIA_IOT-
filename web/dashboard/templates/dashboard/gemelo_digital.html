@@ -122,7 +122,7 @@
                         </div>
                         <span class="text-xs font-bold text-white">Dosel Foliar de Papa</span>
                         <span class="text-[10px] text-slate-400">Variedad Huaycha (Floración)</span>
-                        <div class="mt-2.5 pt-2 border-t border-emerald-500/20 w-full flex justify-around text-xs">
+                        <div class="mt-2.5 pt-2 border-t border-emerald-500/20 w-full grid grid-cols-4 gap-1 text-xs">
                             <div>
                                 <span class="text-[9px] text-slate-400 block">$T_{int}$</span>
                                 <span class="font-bold font-mono text-emerald-400" id="sch-temp-int">--°C</span>
@@ -134,6 +134,10 @@
                             <div>
                                 <span class="text-[9px] text-slate-400 block">VPD</span>
                                 <span class="font-bold font-mono text-indigo-400" id="sch-vpd">-- kPa</span>
+                            </div>
+                            <div>
+                                <span class="text-[9px] text-slate-400 block">Sustrato</span>
+                                <span class="font-bold font-mono text-teal-400" id="sch-vwc">{{ estado.hum_suelo }}% VWC</span>
                             </div>
                         </div>
                     </div>
@@ -258,6 +262,8 @@
             document.getElementById('sch-temp-int').innerText = est.temp_interior.toFixed(1) + "°C";
             document.getElementById('sch-hum-int').innerText = est.hum_interior.toFixed(0) + "%";
             document.getElementById('sch-vpd').innerText = est.vpd_kpa.toFixed(2) + " kPa";
+            const elVwc = document.getElementById('sch-vwc');
+            if (elVwc && est.hum_suelo !== undefined) elVwc.innerText = est.hum_suelo.toFixed(1) + "% VWC";
             document.getElementById('sch-act-ssr').innerText = est.actuador_calefactor_ssr.toFixed(0) + " %";
             document.getElementById('sch-act-extractor').innerText = est.actuador_extractor.toFixed(0) + " %";
             document.getElementById('sch-act-bomba').innerText = est.actuador_bomba_humedad.toFixed(0) + " %";

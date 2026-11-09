@@ -14,12 +14,15 @@ urlpatterns = [
     path('gemelo-digital/', views.gemelo_digital_view, name='gemelo_digital'),
     path('experimentos/', views.experimentos_view, name='experimentos'),
     path('experimentos/exportar-csv/', views.exportar_experimentos_csv, name='exportar_csv'),
-    
+
     # APIs interactivas
     path('api/telemetria/', views.api_telemetria, name='api_telemetria'),
     path('api/setpoints/', views.api_actualizar_setpoints, name='api_setpoints'),
     path('api/pid/', views.api_actualizar_pid, name='api_pid'),
     path('api/autotune/', views.api_autotune, name='api_autotune'),
     path('api/modo-gemelo/', views.api_cambiar_modo_gemelo, name='api_modo_gemelo'),
+    path('api/fenologia/', views.api_aplicar_fenologia, name='api_fenologia'),
+    path('api/modelos-vision/', views.api_modelos_vision, name='api_modelos_vision'),
     path('api/subir-imagen/', views.api_subir_imagen_vision, name='api_subir_imagen'),
+    path('tesis-figura/<str:nombre_figura>/', views.servir_figura_tesis, name='figura_tesis'),
 ]

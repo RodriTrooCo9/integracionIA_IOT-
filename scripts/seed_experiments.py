@@ -50,13 +50,17 @@ def poblar_ensayos():
     
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
+    # Eliminar duplicados previos de E1..E8 para mantener exactamente los 8 protocolos formales
+    codigos = [e[0] for e in ENSAYOS]
+    placeholders = ",".join("?" for _ in codigos)
+    c.execute(f"DELETE FROM experimentos_ensayos WHERE codigo_experimento IN ({placeholders})", codigos)
     c.executemany('''
-        INSERT OR REPLACE INTO experimentos_ensayos 
+        INSERT INTO experimentos_ensayos 
         (codigo_experimento, nombre_ensayo, tratamiento, fecha_inicio, fecha_fin, duracion_horas, observaciones, metricas_resumen_json)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     ''', ENSAYOS)
     conn.commit()
-    print(f"✅ Se han registrado {c.rowcount} ensayos experimentales en SQLite.")
+    print(f"✅ Se han registrado {c.rowcount} ensayos experimentales únicos en SQLite.")
     conn.close()
     return True
 

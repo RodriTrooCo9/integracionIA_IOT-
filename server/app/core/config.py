@@ -39,7 +39,9 @@ class Settings(BaseSettings):
     TELEGRAM_CHAT_ID: str = os.getenv("TELEGRAM_CHAT_ID", "")
     
     # Visión Artificial
-    MODEL_WEIGHTS_PATH: str = str(BASE_DIR / "data" / "models" / "yolo26n_papa.pt")
+    _DEFAULT_COLAB_WEIGHTS: Path = BASE_DIR / "data" / "models" / "entrenados_colab" / "yolo26n_plantdoc_detect" / "weights" / "best.pt"
+    _LEGACY_WEIGHTS: Path = BASE_DIR / "data" / "models" / "yolo26n_papa.pt"
+    MODEL_WEIGHTS_PATH: str = str(_DEFAULT_COLAB_WEIGHTS if _DEFAULT_COLAB_WEIGHTS.is_file() else _LEGACY_WEIGHTS)
     VISION_DEMO_MODE: bool = False
     VISION_BOX_SEMANTICS: Literal["unknown", "whole_leaf", "lesion", "none"] = "unknown"
     UPLOAD_DIR: str = str(BASE_DIR / "data" / "raw" / "uploads")

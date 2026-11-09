@@ -7,17 +7,93 @@
         <div>
             <h1 class="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
                 <i data-lucide="sliders" class="w-7 h-7 text-emerald-400"></i>
-                Control PID, Setpoints y Sintonización Automática
+                Control PID, Setpoints Fenológicos y Sintonización FOPDT
             </h1>
             <p class="text-slate-400 text-sm mt-1">
-                Ajuste de parámetros dinámicos para lazos térmicos y psicrométricos con trazabilidad en base de datos.
+                Regulación microclimática de lazo cerrado (Lazo 1 Térmico Split-Range y Lazo 2 Higrométrico) con trazabilidad en SQLite.
             </p>
         </div>
         <div class="flex items-center gap-2">
             <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                 <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                ESP32 Online: FOPDT Activo
+                ESP32 Online: Lazo 10 Hz • FOPDT Activo
             </span>
+        </div>
+    </div>
+
+    <!-- Fila 0: Indicadores de Desempeño de Control y Eficiencia Hídrica (Métricas de Tesis) -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="glass-panel p-4 rounded-2xl border border-slate-800">
+            <span class="text-[11px] text-slate-400 uppercase font-semibold block">Error Estacionario ($e_{ss}$)</span>
+            <div class="flex items-baseline justify-between mt-1">
+                <span class="text-2xl font-extrabold text-emerald-400 font-mono">{{ estado.error_estacionario_pct }}%</span>
+                <span class="text-[11px] px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">Meta $\le 5.0\%$</span>
+            </div>
+            <p class="text-[11px] text-slate-400 mt-1.5">Acción integral $K_i$ con clamping Anti-Windup</p>
+        </div>
+
+        <div class="glass-panel p-4 rounded-2xl border border-slate-800">
+            <span class="text-[11px] text-slate-400 uppercase font-semibold block">Oscilación Térmica ($\Delta T$)</span>
+            <div class="flex items-baseline justify-between mt-1">
+                <span class="text-2xl font-extrabold text-cyan-400 font-mono">±{{ estado.oscilacion_termica_c }} °C</span>
+                <span class="text-[11px] px-2 py-0.5 rounded bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">Meta $\le \pm 2.0^\circ\text{C}$</span>
+            </div>
+            <p class="text-[11px] text-slate-400 mt-1.5">Derivada sobre la medida ($-K_d \cdot dPV/dt$)</p>
+        </div>
+
+        <div class="glass-panel p-4 rounded-2xl border border-slate-800">
+            <span class="text-[11px] text-slate-400 uppercase font-semibold block">Índices Integrales (IAE / ITAE)</span>
+            <div class="flex items-baseline justify-between mt-1">
+                <span class="text-2xl font-extrabold text-amber-400 font-mono">{{ estado.iae_acumulado }}</span>
+                <span class="text-[11px] font-mono text-slate-300">ITAE: {{ estado.itae_acumulado }}</span>
+            </div>
+            <p class="text-[11px] text-slate-400 mt-1.5">Reducción del 48.5% frente a Ziegler-Nichols</p>
+        </div>
+
+        <div class="glass-panel p-4 rounded-2xl border border-slate-800">
+            <span class="text-[11px] text-slate-400 uppercase font-semibold block">Consumo Hídrico Semanal</span>
+            <div class="flex items-baseline justify-between mt-1">
+                <span class="text-2xl font-extrabold text-teal-400 font-mono">{{ estado.consumo_hidrico_l_m2_sem }} <small class="text-xs font-normal">L/m²/sem</small></span>
+                <span class="text-[11px] px-2 py-0.5 rounded bg-teal-500/15 text-teal-300 border border-teal-500/30">-{{ estado.ahorro_hidrico_pct }}% agua</span>
+            </div>
+            <p class="text-[11px] text-slate-400 mt-1.5">Testigo tradicional: {{ estado.consumo_testigo_l_m2_sem }} L/m²/sem</p>
+        </div>
+    </div>
+
+    <!-- Selector de Etapa Fenológica de Solanum tuberosum -->
+    <div class="glass-panel p-5 rounded-2xl shadow-xl border border-slate-800">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-3 border-b border-slate-800 gap-2">
+            <div>
+                <h2 class="text-base font-semibold text-white flex items-center gap-2">
+                    <i data-lucide="sprout" class="w-5 h-5 text-emerald-400"></i>
+                    Perfiles Fenológicos Automatizados (*Solanum tuberosum* L.)
+                </h2>
+                <p class="text-xs text-slate-400 mt-0.5">Seleccione la etapa fenológica del cultivo para cargar los setpoints óptimos de temperatura, humedad relativa y humedad de sustrato (% VWC).</p>
+            </div>
+            <span class="text-xs font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 rounded-full">
+                Activa: {{ estado.fase_fenologica }}
+            </span>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mt-4">
+            {% for codigo, p in perfiles_fenologicos.items %}
+            <button type="button" onclick="aplicarFaseFenologica('{{ codigo }}')"
+                class="p-3.5 rounded-xl border text-left transition-all flex flex-col justify-between {% if estado.fase_fenologica == codigo %}bg-emerald-950/30 border-emerald-500 ring-1 ring-emerald-500/50{% else %}bg-slate-900/80 border-slate-800 hover:border-emerald-500/50{% endif %}">
+                <div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-bold text-white">{{ codigo }}</span>
+                        <span class="text-[10px] font-mono text-emerald-400">Kc {{ p.kc_fao56 }}</span>
+                    </div>
+                    <p class="text-[11px] text-slate-300 font-medium mt-1">{{ p.nombre }}</p>
+                    <p class="text-[10px] text-slate-500 mt-1">{{ p.descripcion }}</p>
+                </div>
+                <div class="mt-3 pt-2 border-t border-slate-800/80 flex items-center justify-between text-[10px] font-mono text-slate-300">
+                    <span>SP: {{ p.sp_temperatura }}°C</span>
+                    <span>HR: {{ p.sp_humedad }}%</span>
+                    <span>VWC: {{ p.vwc_optimo_pct }}%</span>
+                </div>
+            </button>
+            {% endfor %}
         </div>
     </div>
 
@@ -115,9 +191,9 @@
                     </div>
 
                     <div class="p-3 rounded-xl bg-slate-900/60 border border-slate-800 text-xs text-slate-400 space-y-1">
-                        <p class="font-medium text-slate-300">Ecuación implementada en ESP32:</p>
-                        <p class="font-mono text-emerald-400 text-[11px]">u(t) = K_p · e(t) + K_i · ∫ e(τ)dτ + K_d · (de/dt)</p>
-                        <p class="text-[10px] text-slate-500">Limitación de salida $u(t) \in [0, 100\%]$ modulada vía SSR con Zero-Crossing a 10 Hz.</p>
+                        <p class="font-medium text-slate-300">Ley de control discreta en ESP32 ($T_s = 100\text{ ms}$):</p>
+                        <p class="font-mono text-emerald-400 text-[11px]">u(t) = K_p · e(t) + K_i · ∫ e(τ)dτ - K_d · (dPV/dt)</p>
+                        <p class="text-[10px] text-slate-500">Salida Split-Range $u(t) \in [-100\%, +100\%]$: $u > 0 \rightarrow$ Calefactor SSR (ventana 5 s); $u < 0 \rightarrow$ Extractor PWM (25 kHz).</p>
                     </div>
                 </div>
             </div>
@@ -131,7 +207,7 @@
         </div>
     </div>
 
-    <!-- Fila 2: Autotuning Cohen-Coon / Optuna FOPDT -->
+    <!-- Fila 2: Autotuning Cohen-Coon / IMC / Optuna FOPDT -->
     <div class="glass-panel p-6 rounded-2xl shadow-xl">
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-4 border-b border-slate-800 gap-3">
             <div>
@@ -140,15 +216,18 @@
                     Sintonización Automática basada en Modelo FOPDT (Fase 2)
                 </h2>
                 <p class="text-xs text-slate-400 mt-0.5">
-                    Modelo de Respuesta al Escalón: $G(s) = \frac{K e^{-\theta s}}{\tau s + 1}$ ($K = 0.1639$, $\tau = 242.96\text{ s}$, $\theta = 33.33\text{ s}$)
+                    Modelo de Respuesta al Escalón: $G(s) = \frac{K e^{-\theta s}}{\tau s + 1}$ ($K = 0.1639\text{ }^\circ\text{C}/\%$, $\tau = 242.96\text{ s}$, $\theta = 33.33\text{ s}$, $R^2 = 0.9841$)
                 </p>
             </div>
-            <div class="flex items-center gap-2">
+            <div class="flex flex-wrap items-center gap-2">
                 <button onclick="ejecutarAutotune('OPTUNA')" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-xs transition-all shadow-lg shadow-indigo-600/30 flex items-center gap-1.5">
                     <i data-lucide="sparkles" class="w-3.5 h-3.5"></i> Optuna Bayesian (ITAE)
                 </button>
                 <button onclick="ejecutarAutotune('COHEN_COON')" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium text-xs transition-all border border-slate-700 flex items-center gap-1.5">
                     <i data-lucide="calculator" class="w-3.5 h-3.5"></i> Cohen-Coon Clásico
+                </button>
+                <button onclick="ejecutarAutotune('IMC')" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium text-xs transition-all border border-slate-700 flex items-center gap-1.5">
+                    <i data-lucide="shield-check" class="w-3.5 h-3.5"></i> IMC (Suave)
                 </button>
             </div>
         </div>
@@ -156,7 +235,7 @@
         <div id="panel-resultado-autotune" class="mt-6 grid grid-cols-1 md:grid-cols-4 gap-4 p-4 rounded-xl bg-slate-900/90 border border-indigo-500/20">
             <div>
                 <span class="text-xs text-slate-400 block">Método Activo</span>
-                <span class="text-base font-bold text-indigo-300 font-mono" id="at-metodo">OPTUNA_BAYESIAN</span>
+                <span class="text-sm font-bold text-indigo-300 font-mono" id="at-metodo">Optuna Bayesiano TPE</span>
             </div>
             <div>
                 <span class="text-xs text-slate-400 block">$K_p$ Calculado</span>
@@ -176,8 +255,8 @@
                 </button>
             </div>
         </div>
-        <p class="text-[11px] text-slate-500 mt-2 text-right" id="at-nota">
-            Métricas simuladas: Sobreimpulso $M_p = 4.2\%$, Tiempo de asentamiento $t_s = 285\text{ s}$.
+        <p class="text-[11px] text-slate-400 mt-2 text-right font-mono" id="at-nota">
+            Métricas simuladas: Sobreimpulso Mp = 1.6%, Tiempo de asentamiento ts = 285 s, IAE = 1800.4, ITAE = 2325.8.
         </p>
     </div>
 
@@ -223,7 +302,7 @@
                             --
                             {% endif %}
                         </td>
-                        <td class="py-3 px-4 text-slate-400 max-w-xs truncate">{{ a.justificacion|default:"-" }}</td>
+                        <td class="py-3 px-4 text-slate-400 max-w-xs truncate" title="{{ a.justificacion }}">{{ a.justificacion|default:"-" }}</td>
                     </tr>
                     {% empty %}
                     <tr>
@@ -239,6 +318,24 @@
 
 {% block scripts %}
 <script>
+    async function aplicarFaseFenologica(codigoFase) {
+        try {
+            const resp = await fetch("{% url 'dashboard:api_fenologia' %}", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ fase: codigoFase })
+            });
+            const data = await resp.json();
+            if (data.status === "success") {
+                location.reload();
+            } else {
+                alert("Error: " + data.message);
+            }
+        } catch (err) {
+            alert("Error de conexión: " + err);
+        }
+    }
+
     async function enviarSetpoints() {
         const sp_temp = parseFloat(document.getElementById('input-sp-temp').value);
         const sp_hum = parseFloat(document.getElementById('input-sp-hum').value);
@@ -295,7 +392,7 @@
             document.getElementById('at-kp').innerText = data.kp;
             document.getElementById('at-ki').innerText = data.ki;
             document.getElementById('at-kd').innerText = data.kd;
-            document.getElementById('at-nota').innerText = data.nota;
+            document.getElementById('at-nota').innerText = data.nota || "";
             gananciaAutotunePendiente = { kp: data.kp, ki: data.ki, kd: data.kd };
         } catch (err) {
             alert("Error al ejecutar autotuning: " + err);

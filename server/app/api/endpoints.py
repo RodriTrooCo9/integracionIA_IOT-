@@ -17,7 +17,10 @@ from pydantic import BaseModel, Field
 
 from server.app.core.config import settings
 from server.app.services.database import db_service
-from server.app.services.vision_service import vision_service, VisionUnavailable
+from server.app.services.vision_service import (
+    vision_service, VisionUnavailable, obtener_servicio_modelo,
+    obtener_resumen_modelos_entrenados, procesar_trampa_amarilla_colorimetria
+)
 from server.app.services.mqtt_client import mqtt_service
 from server.app.services.telegram_bot import telegram_service
 
@@ -65,12 +68,22 @@ async def health_check():
 # ------------------------------------------------------------------------------
 # 2. Inferencia de Visión Artificial (YOLO26 / YOLO11 + SAHI)
 # ------------------------------------------------------------------------------
+@router.get("/vision/modelos", tags=["Visión Artificial"])
+async def listar_modelos_vision():
+    """Retorna el catálogo y métricas de validación/test de los checkpoints entrenados."""
+    return {
+        "modelo_por_defecto": settings.MODEL_WEIGHTS_PATH,
+        "modelos": obtener_resumen_modelos_entrenados()
+    }
+
+
 @router.post("/vision/inferir", tags=["Visión Artificial"])
 async def inferir_imagen(
     imagen: UploadFile = File(..., description="Archivo de imagen (JPEG, PNG)"),
     nodo_camara: str = Form("cam_invernadero_01"),
     tipo_origen: str = Form("HOJA_FOLLAJE", description="HOJA_FOLLAJE o TRAMPA_AMARILLA"),
-    usar_sahi: bool = Form(False, description="Forzar segmentación SAHI")
+    usar_sahi: bool = Form(False, description="Forzar segmentación SAHI"),
+    modelo_id: Optional[str] = Form(None, description="ID opcional del modelo (yolo26n_plantdoc_detect, yolo26n_plantvillage_classify, yolo11n_plantdoc_detect)")
 ):
     """
     Recibe una imagen, ejecuta detección (YOLO11n / SAHI), guarda en BD,
@@ -94,11 +107,20 @@ async def inferir_imagen(
 
     # Ejecutar inferencia de visión
     try:
-        resultado = await asyncio.to_thread(vision_service.procesar_imagen,
-            ruta_imagen=str(ruta_destino),
-            tipo_origen=tipo_origen,
-            usar_sahi=usar_sahi
-        )
+        if modelo_id == "heuristica_trampa":
+            resultado = await asyncio.to_thread(
+                procesar_trampa_amarilla_colorimetria,
+                ruta_imagen=str(ruta_destino),
+                usar_sahi=usar_sahi
+            )
+        else:
+            servicio_activo = vision_service if not modelo_id else obtener_servicio_modelo(modelo_id)
+            resultado = await asyncio.to_thread(
+                servicio_activo.procesar_imagen,
+                ruta_imagen=str(ruta_destino),
+                tipo_origen=tipo_origen,
+                usar_sahi=usar_sahi
+            )
     except VisionUnavailable as e:
         ruta_destino.unlink(missing_ok=True)
         raise HTTPException(status_code=503, detail=str(e)) from e

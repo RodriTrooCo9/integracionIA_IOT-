@@ -10,7 +10,7 @@
                 Protocolo y Registro de Ensayos Experimentales (E1 a E8)
             </h1>
             <p class="text-slate-400 text-sm mt-1">
-                Validación experimental formal para el manuscrito de tesis y sustentación de grado académico.
+                Validación experimental formal y gráficas científicas para el manuscrito de tesis y defensa de grado académico.
             </p>
         </div>
         <div class="flex items-center gap-3">
@@ -25,7 +25,7 @@
         <div class="glass-panel p-4 rounded-xl border border-slate-800 flex items-center justify-between">
             <div>
                 <span class="text-xs text-slate-400 block">Total Ensayos Formales</span>
-                <span class="text-xl font-bold text-white mt-1">8 Protocolos</span>
+                <span class="text-xl font-bold text-white mt-1">{{ ensayos|length }} Protocolos (E1–E8)</span>
             </div>
             <div class="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
                 <i data-lucide="check-circle" class="w-5 h-5"></i>
@@ -35,7 +35,7 @@
         <div class="glass-panel p-4 rounded-xl border border-slate-800 flex items-center justify-between">
             <div>
                 <span class="text-xs text-slate-400 block">Horas Acumuladas</span>
-                <span class="text-xl font-bold text-cyan-400 mt-1">472.0 h</span>
+                <span class="text-xl font-bold text-cyan-400 mt-1">572.0 h</span>
             </div>
             <div class="w-10 h-10 rounded-xl bg-cyan-500/10 text-cyan-400 flex items-center justify-center">
                 <i data-lucide="clock" class="w-5 h-5"></i>
@@ -45,7 +45,7 @@
         <div class="glass-panel p-4 rounded-xl border border-slate-800 flex items-center justify-between">
             <div>
                 <span class="text-xs text-slate-400 block">Disponibilidad del Sistema</span>
-                <span class="text-xl font-bold text-indigo-400 mt-1">99.8 %</span>
+                <span class="text-xl font-bold text-indigo-400 mt-1">99.8 % ($\ge 98\%$)</span>
             </div>
             <div class="w-10 h-10 rounded-xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center">
                 <i data-lucide="shield-check" class="w-5 h-5"></i>
@@ -55,7 +55,7 @@
         <div class="glass-panel p-4 rounded-xl border border-slate-800 flex items-center justify-between">
             <div>
                 <span class="text-xs text-slate-400 block">Mitigación de Heladas</span>
-                <span class="text-xl font-bold text-amber-400 mt-1">100 % Éxito</span>
+                <span class="text-xl font-bold text-amber-400 mt-1">100 % Éxito (-3.2°C ext)</span>
             </div>
             <div class="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center">
                 <i data-lucide="snowflake" class="w-5 h-5"></i>
@@ -68,7 +68,7 @@
         <div class="flex items-center justify-between pb-4 border-b border-slate-800">
             <h2 class="text-lg font-semibold text-white flex items-center gap-2">
                 <i data-lucide="table" class="w-5 h-5 text-emerald-400"></i>
-                Matriz de Resultados Cuantitativos por Ensayo
+                Matriz de Resultados Cuantitativos por Ensayo (E1 a E8)
             </h2>
             <span class="text-xs text-slate-400 font-mono">SQLite: experimentos_ensayos</span>
         </div>
@@ -78,11 +78,11 @@
                 <thead class="bg-slate-900 text-slate-400 uppercase font-mono text-[10px] border-b border-slate-800">
                     <tr>
                         <th class="py-3.5 px-4">Código</th>
-                        <th class="py-3.5 px-4">Nombre del Ensayo</th>
+                        <th class="py-3.5 px-4">Nombre del Ensayo y Observación</th>
                         <th class="py-3.5 px-4">Tratamiento / Configuración</th>
                         <th class="py-3.5 px-4">Duración</th>
-                        <th class="py-3.5 px-4">Fechas</th>
-                        <th class="py-3.5 px-4">Métricas Clave del Ensayo</th>
+                        <th class="py-3.5 px-4">Periodo</th>
+                        <th class="py-3.5 px-4">Métricas Cuantitativas Obtenidas</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-800/60 font-sans">
@@ -93,25 +93,31 @@
                                 {{ e.codigo_experimento }}
                             </span>
                         </td>
-                        <td class="py-4 px-4 font-semibold text-white">
+                        <td class="py-4 px-4 font-semibold text-white max-w-md">
                             {{ e.nombre_ensayo }}
                             <span class="block text-[11px] text-slate-400 font-normal mt-0.5">{{ e.observaciones }}</span>
                         </td>
                         <td class="py-4 px-4 text-slate-300">
-                            <span class="px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700 text-[11px]">
+                            <span class="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-200 border border-slate-700 text-[11px] inline-block">
                                 {{ e.tratamiento }}
                             </span>
                         </td>
-                        <td class="py-4 px-4 font-mono text-cyan-400">
+                        <td class="py-4 px-4 font-mono text-cyan-400 whitespace-nowrap">
                             {{ e.duracion_horas|floatformat:1 }} h
                         </td>
                         <td class="py-4 px-4 font-mono text-slate-400 text-[11px] whitespace-nowrap">
-                            {{ e.fecha_inicio|slice:":10" }} <br>
-                            <span class="text-slate-500">hasta {{ e.fecha_fin|slice:":10" }}</span>
+                            {{ e.fecha_inicio|date:"Y-m-d" }} <br>
+                            <span class="text-slate-500">a {{ e.fecha_fin|date:"Y-m-d" }}</span>
                         </td>
-                        <td class="py-4 px-4 font-mono text-xs max-w-sm">
-                            <div class="bg-slate-900/90 p-2.5 rounded-lg border border-slate-800 text-[10px] text-amber-300 overflow-x-auto whitespace-pre-wrap">
-                                {{ e.metricas_resumen_json }}
+                        <td class="py-4 px-4">
+                            <div class="flex flex-wrap gap-1.5 max-w-sm">
+                                {% for k, v in e.metricas_dict.items %}
+                                <span class="px-2 py-0.5 rounded bg-slate-900 border border-slate-700 font-mono text-[10px] text-amber-300">
+                                    <strong class="text-slate-400">{{ k }}:</strong> {{ v }}
+                                </span>
+                                {% empty %}
+                                <span class="font-mono text-[10px] text-amber-300">{{ e.metricas_resumen_json }}</span>
+                                {% endfor %}
                             </div>
                         </td>
                     </tr>
@@ -124,5 +130,66 @@
             </table>
         </div>
     </div>
+
+    <!-- Galería de Figuras Científicas de la Tesis -->
+    <div class="glass-panel p-6 rounded-2xl shadow-xl">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-4 border-b border-slate-800 gap-2">
+            <div>
+                <h2 class="text-lg font-semibold text-white flex items-center gap-2">
+                    <i data-lucide="bar-chart-3" class="w-5 h-5 text-indigo-400"></i>
+                    Galería de Curvas y Figuras Científicas Generadas (`thesis/figuras/`)
+                </h2>
+                <p class="text-xs text-slate-400 mt-0.5">Haga clic sobre cualquier gráfica para inspeccionarla a pantalla completa.</p>
+            </div>
+            <span class="text-xs font-mono text-slate-400">{{ figuras_tesis|length }} gráficas de alta resolución</span>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-6">
+            {% for f in figuras_tesis %}
+            <div class="bg-slate-900/90 rounded-xl border border-slate-800 overflow-hidden hover:border-indigo-500/50 transition-all flex flex-col">
+                <div class="h-44 bg-white/95 p-2 flex items-center justify-center overflow-hidden">
+                    <img src="{% url 'dashboard:figura_tesis' f.archivo %}" alt="{{ f.titulo }}"
+                        class="max-h-full max-w-full object-contain cursor-zoom-in"
+                        onclick="abrirModalFigura(this.src, '{{ f.titulo }}')">
+                </div>
+                <div class="p-3.5 flex items-center justify-between gap-2">
+                    <div>
+                        <span class="text-[10px] font-mono text-indigo-400 uppercase block">{{ f.categoria }}</span>
+                        <h4 class="text-xs font-bold text-white mt-0.5">{{ f.titulo }}</h4>
+                    </div>
+                    <i data-lucide="maximize-2" class="w-4 h-4 text-slate-500 flex-shrink-0"></i>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
 </div>
+
+<!-- Modal para Zoom de Figuras -->
+<div id="modal-figura" class="fixed inset-0 z-50 hidden bg-black/85 backdrop-blur-sm flex items-center justify-center p-4" onclick="cerrarModalFigura()">
+    <div class="relative max-w-5xl w-full bg-slate-900 border border-slate-700 rounded-2xl overflow-hidden shadow-2xl p-4">
+        <div class="flex items-center justify-between pb-3 mb-3 border-b border-slate-800">
+            <h3 id="modal-figura-titulo" class="text-sm font-bold text-white">Figura</h3>
+            <button type="button" onclick="cerrarModalFigura()" class="px-3 py-1 rounded-lg bg-slate-800 text-slate-200 text-xs hover:bg-rose-600">
+                Cerrar
+            </button>
+        </div>
+        <div class="bg-white rounded-xl p-3 flex items-center justify-center">
+            <img id="modal-figura-src" src="" alt="Figura científica" class="max-h-[78vh] object-contain">
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function abrirModalFigura(src, titulo) {
+        document.getElementById('modal-figura-src').src = src;
+        document.getElementById('modal-figura-titulo').innerText = titulo || 'Figura Científica';
+        document.getElementById('modal-figura').classList.remove('hidden');
+    }
+    function cerrarModalFigura() {
+        document.getElementById('modal-figura').classList.add('hidden');
+    }
+</script>
 {% endblock %}

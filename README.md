@@ -43,6 +43,10 @@ en el entorno de inferencia; consulta [la entrega de pesos al backend](docs/yolo
 
 ## 1. Arquitectura General del Sistema
 
+La [guía de hardware e infraestructura](docs/README_hardware_infraestructura.md)
+reúne los componentes, conexiones, alimentación, montaje, presupuesto y datos
+pendientes para construir y documentar el prototipo.
+
 El sistema implementa una arquitectura en cascada desacoplada:
 1. **Lazo Rápido Local (ESP32):** Ejecuta control PID continuo a 10 Hz para temperatura y humedad con modulación por ancho de pulso proporcional a tiempo (SSR) y PWM (extractores). Si se interrumpe la red o el servidor central, el nodo sigue operando en modo autónomo.
 2. **Lazo de Supervisión (Servidor IoT / Docker):** Ingesta datos mediante Mosquitto y Telegraf hacia InfluxDB v2, permitiendo visualización en Grafana. Un servicio FastAPI orquesta la inferencia de visión (YOLO + SAHI) y el modelo de riesgo fitopatológico (BlightManager + ML), ajustando los setpoints del lazo rápido por MQTT.
