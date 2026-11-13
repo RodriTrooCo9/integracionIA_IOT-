@@ -1,0 +1,405 @@
+{
+  "timestamp": "2026-11-13 13:21:02",
+  "environment": {
+    "python": "3.14.4",
+    "cpu_count_logical": 12,
+    "ram_total_gb": 6.92,
+    "ram_available_gb": 1.6
+  },
+  "codebase": {
+    "loc_by_area": {
+      "server": {
+        "files": 14,
+        "total_lines": 1383,
+        "non_empty_lines": 1246
+      },
+      "web": {
+        "files": 18,
+        "total_lines": 3534,
+        "non_empty_lines": 3200
+      },
+      "scripts": {
+        "files": 22,
+        "total_lines": 5181,
+        "non_empty_lines": 4664
+      },
+      "firmware": {
+        "files": 3,
+        "total_lines": 517,
+        "non_empty_lines": 441
+      },
+      "tests": {
+        "files": 13,
+        "total_lines": 1645,
+        "non_empty_lines": 1386
+      },
+      "config": {
+        "files": 4,
+        "total_lines": 193,
+        "non_empty_lines": 159
+      }
+    },
+    "hardcoded_home_paths": [
+      "scripts/backup_sistema_iot.sh:10",
+      "scripts/ejecutar_fase5_riesgo_fusion.py:212",
+      "scripts/ejecutar_fase5_riesgo_fusion.py:393",
+      "scripts/ejecutar_fase5_riesgo_fusion.py:446",
+      "scripts/generar_dataset_agroclimatico.py:214"
+    ],
+    "csrf_exempt_count": 5,
+    "csrf_exempt_locations": [
+      "web/dashboard/views.py:227",
+      "web/dashboard/views.py:278",
+      "web/dashboard/views.py:314",
+      "web/dashboard/views.py:359",
+      "web/dashboard/views.py:389"
+    ],
+    "long_functions_gt_60_lines": [
+      {
+        "file": "scripts/ejecutar_fase5_riesgo_fusion.py",
+        "function": "main",
+        "lines": 373,
+        "start_line": 206
+      },
+      {
+        "file": "scripts/ejecutar_fase4_evaluacion_vision.py",
+        "function": "ejecutar_benchmark_y_graficos",
+        "lines": 181,
+        "start_line": 30
+      },
+      {
+        "file": "scripts/ejecutar_fase2_identificacion_pid.py",
+        "function": "main",
+        "lines": 175,
+        "start_line": 312
+      },
+      {
+        "file": "scripts/generar_dataset_agroclimatico.py",
+        "function": "generar_dataset_invernadero",
+        "lines": 168,
+        "start_line": 44
+      },
+      {
+        "file": "web/dashboard/services.py",
+        "function": "actualizar_gemelo_digital",
+        "lines": 166,
+        "start_line": 146
+      },
+      {
+        "file": "web/dashboard/views.py",
+        "function": "api_subir_imagen_vision",
+        "lines": 128,
+        "start_line": 390
+      },
+      {
+        "file": "scripts/preparar_dataset_vision.py",
+        "function": "generar_dataset_base",
+        "lines": 121,
+        "start_line": 42
+      },
+      {
+        "file": "server/app/services/vision_service.py",
+        "function": "procesar_imagen",
+        "lines": 114,
+        "start_line": 88
+      },
+      {
+        "file": "server/app/api/endpoints.py",
+        "function": "inferir_imagen",
+        "lines": 114,
+        "start_line": 81
+      },
+      {
+        "file": "scripts/simulador_esp32_mqtt.py",
+        "function": "main",
+        "lines": 113,
+        "start_line": 86
+      },
+      {
+        "file": "scripts/iniciar_colab.py",
+        "function": "iniciar_colab",
+        "lines": 110,
+        "start_line": 18
+      },
+      {
+        "file": "scripts/reparar_dataset_colab.py",
+        "function": "repair_dataset",
+        "lines": 95,
+        "start_line": 15
+      },
+      {
+        "file": "scripts/crear_notebooks_vision.py",
+        "function": "evaluation",
+        "lines": 82,
+        "start_line": 253
+      },
+      {
+        "file": "scripts/empaquetar_colab.py",
+        "function": "build_package",
+        "lines": 70,
+        "start_line": 26
+      },
+      {
+        "file": "server/app/services/vision_service.py",
+        "function": "procesar_trampa_amarilla_colorimetria",
+        "lines": 69,
+        "start_line": 281
+      },
+      {
+        "file": "server/app/worker.py",
+        "function": "ciclo_supervision",
+        "lines": 67,
+        "start_line": 145
+      },
+      {
+        "file": "web/dashboard/services.py",
+        "function": "ejecutar_autotune_pid",
+        "lines": 67,
+        "start_line": 314
+      },
+      {
+        "file": "scripts/preparar_datasets_reales.py",
+        "function": "prepare",
+        "lines": 64,
+        "start_line": 252
+      }
+    ],
+    "async_blocking_suspects": [
+      "server/app/worker.py:211 (ciclo_supervision -> sleep)",
+      "server/app/services/telegram_bot.py:93 (enviar_alerta_con_foto -> open)",
+      "server/app/api/endpoints.py:103 (inferir_imagen -> open)",
+      "server/app/api/endpoints.py:104 (inferir_imagen -> copyfileobj)"
+    ],
+    "secret_literal_matches": [
+      "web/invernadero_web/settings.py:23",
+      "config/telegraf/telegraf.conf:23",
+      "config/telegraf/telegraf.conf:34"
+    ],
+    "flake8_c901_gt_10": [
+      "./scripts/empaquetar_colab.py:26:1: C901 'build_package' is too complex (16)",
+      "./scripts/entrenar_yolo26.py:176:1: C901 '_validate_recovery_model' is too complex (18)",
+      "./scripts/entrenar_yolo26.py:237:1: C901 'recover_experiment' is too complex (11)",
+      "./scripts/flujo_colab.py:194:1: C901 'inspect_progress' is too complex (14)",
+      "./scripts/generar_dataset_agroclimatico.py:44:1: C901 'generar_dataset_invernadero' is too complex (19)",
+      "./scripts/iniciar_colab.py:18:1: C901 'iniciar_colab' is too complex (29)",
+      "./scripts/organizar_ramas_colab.py:25:1: C901 'organize_branch' is too complex (13)",
+      "./scripts/preparar_dataset_vision.py:42:1: C901 'generar_dataset_base' is too complex (13)",
+      "./scripts/preparar_datasets_reales.py:54:1: C901 'acquire' is too complex (16)",
+      "./scripts/preparar_datasets_reales.py:144:1: C901 'split_records' is too complex (12)",
+      "./scripts/preparar_datasets_reales.py:200:1: C901 'verify_dataset' is too complex (15)",
+      "./scripts/preparar_datasets_reales.py:252:1: C901 'prepare' is too complex (11)",
+      "./scripts/reparar_dataset_colab.py:15:1: C901 'repair_dataset' is too complex (22)",
+      "./server/app/services/vision_service.py:41:5: C901 'VisionInferenceService._cargar_modelo' is too complex (15)",
+      "./server/app/services/vision_service.py:88:5: C901 'VisionInferenceService.procesar_imagen' is too complex (19)",
+      "./web/dashboard/services.py:146:1: C901 'actualizar_gemelo_digital' is too complex (16)",
+      "./web/dashboard/views.py:390:1: C901 'api_subir_imagen_vision' is too complex (17)"
+    ]
+  },
+  "storage_and_sqlite": {
+    "sizes_mb": {
+      "data_total": 330.882,
+      "data_models": 15.572,
+      "data_processed": 188.358,
+      "data_raw": 117.831,
+      "data_synthetic": 0.235,
+      "backups": 58.957,
+      "notebooks": 0.575,
+      "firmware_bin_bytes": 818992
+    },
+    "sqlite": {
+      "exists": true,
+      "size_mb": 0.223,
+      "journal_mode": "wal",
+      "synchronous": 2,
+      "page_size": 4096,
+      "page_count": 57,
+      "tables": {
+        "auditoria_control_pid": 41,
+        "auth_group": 0,
+        "auth_group_permissions": 0,
+        "auth_permission": 44,
+        "auth_user": 1,
+        "auth_user_groups": 0,
+        "auth_user_user_permissions": 0,
+        "control_publicado": 0,
+        "detecciones_vision": 5,
+        "django_admin_log": 0,
+        "django_content_type": 11,
+        "django_migrations": 18,
+        "django_session": 0,
+        "eventos_alarmas": 11,
+        "experimentos_ensayos": 8,
+        "nodos_sensores": 4,
+        "seed_fixtures": 0,
+        "sqlite_sequence": 10
+      },
+      "indexes": [
+        "auth_group_permissions_group_id_b120cbf9",
+        "auth_group_permissions_group_id_permission_id_0cd325b0_uniq",
+        "auth_group_permissions_permission_id_84c5c92e",
+        "auth_permission_content_type_id_2f476e4b",
+        "auth_permission_content_type_id_codename_01ab375a_uniq",
+        "auth_user_groups_group_id_97559544",
+        "auth_user_groups_user_id_6a12ed8b",
+        "auth_user_groups_user_id_group_id_94350c0c_uniq",
+        "auth_user_user_permissions_permission_id_1fbb5f2c",
+        "auth_user_user_permissions_user_id_a95ead1b",
+        "auth_user_user_permissions_user_id_permission_id_14a6b632_uniq",
+        "django_admin_log_content_type_id_c4bce8eb",
+        "django_admin_log_user_id_c564eba6",
+        "django_content_type_app_label_model_76bd3d3b_uniq",
+        "django_session_expire_date_a5c62663",
+        "idx_detecciones_clase",
+        "idx_detecciones_fecha",
+        "idx_eventos_nivel",
+        "idx_experimentos_codigo",
+        "sqlite_autoindex_auth_group_1",
+        "sqlite_autoindex_auth_user_1",
+        "sqlite_autoindex_control_publicado_1",
+        "sqlite_autoindex_django_session_1",
+        "sqlite_autoindex_nodos_sensores_1",
+        "sqlite_autoindex_seed_fixtures_1"
+      ],
+      "experimentos_duplicates": []
+    }
+  },
+  "ml_and_simulation": {
+    "dataset_rows": 2160,
+    "dataset_gen_90d_ms": 13.17,
+    "feature_eng_24cols_ms": 5.23,
+    "xgb_train_calibrate_ms": 232.62,
+    "xgb_infer_432_rows_ms": 0.629,
+    "shap_treeexplainer_432_rows_ms": 31.34,
+    "xgb_test_roc_auc": 0.7123,
+    "xgb_test_brier": 0.1878
+  },
+  "runtime_benchmarks": {
+    "vision_cpu": {
+      "yolo26n_plantdoc_detect": {
+        "weights_size_mb": 5.179,
+        "cold_load_ms": 31.46,
+        "rss_delta_mb": 17.02,
+        "warm_mean_ms": 44.92,
+        "warm_p50_ms": 44.51,
+        "warm_p95_ms": 47.41,
+        "warm_min_ms": 42.12,
+        "warm_max_ms": 47.67,
+        "sample_output_class": "tizon_tardio",
+        "sample_conf": 0.72,
+        "sahi_320_mean_ms": 249.78,
+        "sahi_320_max_ms": 301.4
+      },
+      "yolo26n_plantvillage_classify": {
+        "weights_size_mb": 3.042,
+        "cold_load_ms": 11.79,
+        "rss_delta_mb": 0.05,
+        "warm_mean_ms": 9.28,
+        "warm_p50_ms": 9.25,
+        "warm_p95_ms": 9.65,
+        "warm_min_ms": 8.94,
+        "warm_max_ms": 9.68,
+        "sample_output_class": "hoja_sana",
+        "sample_conf": 1.0
+      },
+      "yolo11n_plantdoc_detect": {
+        "weights_size_mb": 5.23,
+        "cold_load_ms": 34.17,
+        "rss_delta_mb": 0.03,
+        "warm_mean_ms": 48.25,
+        "warm_p50_ms": 47.83,
+        "warm_p95_ms": 50.21,
+        "warm_min_ms": 46.88,
+        "warm_max_ms": 50.67,
+        "sample_output_class": "tizon_temprano",
+        "sample_conf": 0.674
+      },
+      "heuristica_trampa_hsv": {
+        "warm_mean_ms": 3.75,
+        "warm_p95_ms": 7.26,
+        "sample_count": 0
+      }
+    },
+    "fastapi_endpoints": {
+      "GET /": {
+        "status": 200,
+        "mean_ms": 3.4,
+        "p95_ms": 10.48
+      },
+      "GET /api/v1/health": {
+        "status": 200,
+        "mean_ms": 2.3,
+        "p95_ms": 3.68
+      },
+      "GET /api/v1/vision/modelos": {
+        "status": 200,
+        "mean_ms": 2.27,
+        "p95_ms": 3.31
+      },
+      "GET /api/v1/vision/historial": {
+        "status": 200,
+        "mean_ms": 3.1,
+        "p95_ms": 7.88
+      },
+      "GET /api/v1/alertas": {
+        "status": 200,
+        "mean_ms": 8.0,
+        "p95_ms": 33.54
+      },
+      "POST /api/v1/control/setpoints": {
+        "status": 200,
+        "mean_ms": 2.75,
+        "p95_ms": 3.41
+      },
+      "POST /api/v1/vision/inferir (yolo26n_detect)": {
+        "status": 200,
+        "mean_ms": 98.6,
+        "p95_ms": 109.67
+      }
+    },
+    "django_endpoints": {
+      "GET /": {
+        "status": 200,
+        "mean_ms": 5.74,
+        "p95_ms": 17.24,
+        "bytes": 40097
+      },
+      "GET /control-pid/": {
+        "status": 200,
+        "mean_ms": 2.14,
+        "p95_ms": 2.83,
+        "bytes": 46112
+      },
+      "GET /vision/": {
+        "status": 200,
+        "mean_ms": 1.8,
+        "p95_ms": 2.36,
+        "bytes": 50125
+      },
+      "GET /gemelo-digital/": {
+        "status": 200,
+        "mean_ms": 0.67,
+        "p95_ms": 0.87,
+        "bytes": 25114
+      },
+      "GET /experimentos/": {
+        "status": 200,
+        "mean_ms": 2.36,
+        "p95_ms": 2.94,
+        "bytes": 52391
+      },
+      "GET /api/telemetria/": {
+        "status": 200,
+        "mean_ms": 0.26,
+        "p95_ms": 0.31,
+        "bytes": 1944
+      },
+      "GET /api/autotune/": {
+        "status": 200,
+        "mean_ms": 0.21,
+        "p95_ms": 0.26,
+        "bytes": 452
+      }
+    },
+    "rss_peak_mb": 881.18
+  }
+}

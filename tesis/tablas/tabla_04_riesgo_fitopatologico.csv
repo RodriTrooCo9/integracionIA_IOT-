@@ -1,0 +1,6 @@
+Modelo,ROC-AUC,PR-AUC,Brier Score,F1-Score,Latencia CPU (ms),Seleccionado,Delta_Brier_vs_XGBoost,Delta_AUC_vs_XGBoost,Tipo_Evidencia
+BlightManager (Wallin 1962),1.0,1.0,0.0105,0.9712,0.0,No (Línea Base),-0.1773,0.2877,Línea base determinística (usa blight_units_7d)
+Random Forest (Calibrado),0.6856,0.7783,0.2099,0.632,0.013,No,0.0221,-0.0267,ML sobre 24 variables telemetría (sin blight_units_7d)
+XGBoost (Calibrado),0.7123,0.7641,0.1878,0.6497,0.038,SI (Ganador),0.0,0.0,ML sobre 24 variables telemetría (sin blight_units_7d)
+Support Vector Machine (RBF),0.7358,0.8089,0.2037,0.6402,0.026,No,0.0159,0.0235,ML sobre 24 variables telemetría (sin blight_units_7d)
+Bioclimatic LSTM (PyTorch),0.6656,0.7931,0.2649,0.6629,0.019,No (Complejidad),0.0771,-0.0467,ML sobre 24 variables telemetría (sin blight_units_7d)

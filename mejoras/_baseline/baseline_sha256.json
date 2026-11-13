@@ -1,0 +1,316 @@
+{
+  "generated_at_utc": "2026-11-13T17:19:08.992928+00:00",
+  "git_head": "b898902fb90c9a02a7aec37fd5aa0b33cd8c392e",
+  "git_tag": "tesis-v1",
+  "file_count": 77,
+  "files": {
+    "data/models/entrenados_colab/resumen_evaluacion_final.csv": {
+      "sha256": "3a2c81e836b671a9edd364b0920a897efec4b6d533a463d001df6eec9dc6b548",
+      "bytes": 504
+    },
+    "data/models/entrenados_colab/seleccion_por_validacion.json": {
+      "sha256": "30ee9bed6938b7f6474d3d19cd69e33435ce9437a6f2d0a06a1051523b821c70",
+      "bytes": 482
+    },
+    "data/models/entrenados_colab/verificacion.json": {
+      "sha256": "571ec4db14081664e0a617769f39c8fb4ef400b0dc20081ae3de4291acb76f90",
+      "bytes": 5431
+    },
+    "data/models/entrenados_colab/yolo11n_plantdoc_detect/args.yaml": {
+      "sha256": "bf785e60afde36e56e0a7e1f402033787684740670157fa20fe43f2f4aaea7ac",
+      "bytes": 1850
+    },
+    "data/models/entrenados_colab/yolo11n_plantdoc_detect/dataset.manifest.json": {
+      "sha256": "f1b6cf93b29d295ef5ff654d9b0e507a588a2e942515664af440947f92dd9d25",
+      "bytes": 393319
+    },
+    "data/models/entrenados_colab/yolo11n_plantdoc_detect/experiment.json": {
+      "sha256": "6f196b98c126bbb2221f721b9a3396a96c535a5a38f87082c35cae022e061884",
+      "bytes": 1838
+    },
+    "data/models/entrenados_colab/yolo11n_plantdoc_detect/results.csv": {
+      "sha256": "9df4fb2258190b77def29c6094ea70e92940ca0b69b410d8967639fdedccfd03",
+      "bytes": 5438
+    },
+    "data/models/entrenados_colab/yolo11n_plantdoc_detect/weights/best.metadata.json": {
+      "sha256": "e7a3bf4a7c185f2d7501c563a95b51da33071b4625e546e0d916fd53023ce80b",
+      "bytes": 1230
+    },
+    "data/models/entrenados_colab/yolo11n_plantdoc_detect/weights/best.pt": {
+      "sha256": "9dff00d5be2e226434ec9ae18683f38efff05ad7cbaeb89324f656d79f8d4508",
+      "bytes": 5484122
+    },
+    "data/models/entrenados_colab/yolo26n_plantdoc_detect/args.yaml": {
+      "sha256": "b30ec01e656dbd97b23321795d7195237c6e6ef860258ec702679ba29b48cb55",
+      "bytes": 1850
+    },
+    "data/models/entrenados_colab/yolo26n_plantdoc_detect/dataset.manifest.json": {
+      "sha256": "f1b6cf93b29d295ef5ff654d9b0e507a588a2e942515664af440947f92dd9d25",
+      "bytes": 393319
+    },
+    "data/models/entrenados_colab/yolo26n_plantdoc_detect/experiment.json": {
+      "sha256": "54887edc42b1be52a8b718acb8d7564f0192d157d9229697291ea89e0e1bb324",
+      "bytes": 2196
+    },
+    "data/models/entrenados_colab/yolo26n_plantdoc_detect/results.csv": {
+      "sha256": "5fe05347f4af09c81bc13b862f1d669600357a82c6ce78281de92863a16c86ab",
+      "bytes": 5065
+    },
+    "data/models/entrenados_colab/yolo26n_plantdoc_detect/weights/best.metadata.json": {
+      "sha256": "71a05d846a3d20b7e9872ac92fdbce9f3e9ec828625975a7d16c75e4bbc06baf",
+      "bytes": 1230
+    },
+    "data/models/entrenados_colab/yolo26n_plantdoc_detect/weights/best.pt": {
+      "sha256": "24e18b2f9fd3e3aabf834b409b7bdf0eea763061633e41e2022f71ad8038b57b",
+      "bytes": 5430853
+    },
+    "data/models/entrenados_colab/yolo26n_plantvillage_classify/args.yaml": {
+      "sha256": "2728b086ec67f66aace114bc907439de487c4db9bc494b8405802239e8c40c85",
+      "bytes": 1848
+    },
+    "data/models/entrenados_colab/yolo26n_plantvillage_classify/dataset.manifest.json": {
+      "sha256": "24d34da90308cd3a2cbc213d91c3179094dfe9ee4363d6cd94d4208b8f957ebb",
+      "bytes": 1403395
+    },
+    "data/models/entrenados_colab/yolo26n_plantvillage_classify/experiment.json": {
+      "sha256": "a8894716f00ce58f0d42f28d729ec76934296ed53a60b09f5e24404deb81fcdd",
+      "bytes": 1652
+    },
+    "data/models/entrenados_colab/yolo26n_plantvillage_classify/results.csv": {
+      "sha256": "7356224c500641f91038bc86b721928aab0698bd3cb2e1aa6673051139279781",
+      "bytes": 1801
+    },
+    "data/models/entrenados_colab/yolo26n_plantvillage_classify/weights/best.metadata.json": {
+      "sha256": "2a4ec908148efc9f153ab42db5c28c287584e2702d52692390dc8847f4e05352",
+      "bytes": 909
+    },
+    "data/models/entrenados_colab/yolo26n_plantvillage_classify/weights/best.pt": {
+      "sha256": "d148b59f0a691f144faf6469c082cee36615112908f5f29e1ed33cb908db90ab",
+      "bytes": 3190018
+    },
+    "data/processed/papa_plantdoc_yolo/report.json": {
+      "sha256": "1bbb9ca56228047ed41be7b09c48e9112688ffd4b7fb3492b8fac5446acd9559",
+      "bytes": 1253
+    },
+    "data/processed/papa_plantvillage_clasificacion/report.json": {
+      "sha256": "c44701cd948d9a1ad441b69e6579b8aba10d4a2ed55cb3fb8d2f1ff924ffa08b",
+      "bytes": 817
+    },
+    "data/synthetic/dataset_agroclimatico_invernadero.csv": {
+      "sha256": "2688aaef075771a8b4a0fa1ce2e07a222a92c6573f07b5706b64883e542b2b45",
+      "bytes": 198857
+    },
+    "data/synthetic/metricas_comparativa_pid_onoff.csv": {
+      "sha256": "ea7a323a3245bb9f902f1270df0a372de989ea6171e73dff79575ad498ee4eb9",
+      "bytes": 881
+    },
+    "data/synthetic/metricas_experimentos_e1_e2_e3.csv": {
+      "sha256": "57cac744f7a708f3893752419b3eef790d453ca2392cfec390cfc38795877b91",
+      "bytes": 711
+    },
+    "data/synthetic/metricas_experimentos_fase5_riesgo.csv": {
+      "sha256": "59faa0d4a0eba718ec5438dd81d301d2257fd2e92aab6d8d55102b1640294ebc",
+      "bytes": 418
+    },
+    "data/synthetic/prueba_escalon_fopdt.csv": {
+      "sha256": "6e3c1800e3b28eb32492f3026b695a9a1baf36b763f1ae0a6b325258221cfc56",
+      "bytes": 42983
+    },
+    "firmware/esp32_control/.pio/build/esp32dev/firmware.bin": {
+      "sha256": "147bffa7da79f5ed974305b2b4b3c4efb06a1681c994c9f4f04c9f5cc1011379",
+      "bytes": 818992
+    },
+    "tesis/00_auditoria.md": {
+      "sha256": "cea915f32f297325e398b091936b3cb16199884569ed7dc25dfe23e9849af348",
+      "bytes": 19214
+    },
+    "tesis/01_fuentes.md": {
+      "sha256": "f7bc8ab1d0b90d66e7328e4513c2ed3ef6c93241f9e8a1e85579e6531cb6394b",
+      "bytes": 19652
+    },
+    "tesis/02_analisis_datos.md": {
+      "sha256": "1f26c802deb4a373087c88600924923b25d8638051b839df3caa37bb81a9a37c",
+      "bytes": 25628
+    },
+    "tesis/03_figuras_diagramas.md": {
+      "sha256": "9590a3a790725051669dea38351efc3c7981b451de7e3ad6294f7949a72b6894",
+      "bytes": 17831
+    },
+    "tesis/04_revision_apa7.md": {
+      "sha256": "6475e166ea13fcc5d71eb929f5dd00b206c5533fdfa9d04abac07896f18f31ba",
+      "bytes": 19645
+    },
+    "tesis/Tesis_Capitulos_I_II_III_APA7.docx": {
+      "sha256": "8cdc01b7c8d74aa87ae803cdfde454d3a5a00b127f1ebe21ae84356c3fdf138a",
+      "bytes": 7542073
+    },
+    "tesis/anexos_instrumentos.md": {
+      "sha256": "98adb5a61b3d5951eb9385c8e64da1d6201e5d12effcd364e4f8b6d5b54c577d",
+      "bytes": 26875
+    },
+    "tesis/cap1_introduccion.md": {
+      "sha256": "5333ead20b574843b2dfe871baa1cfaaa55dfc503b206a037d6dd99bf28596f6",
+      "bytes": 29326
+    },
+    "tesis/cap2_marco_teorico.md": {
+      "sha256": "a76173122f016ad222dca4d9cb629e91a8b81154e62b57577016cb939d81671f",
+      "bytes": 74293
+    },
+    "tesis/cap3_diseno_metodologico.md": {
+      "sha256": "bdfc7784b3638973d4e8862072647f2cf3b8640dd3d76d3e5e921b1e552abfc8",
+      "bytes": 95326
+    },
+    "tesis/figuras/fig_arq_sistema_real.png": {
+      "sha256": "e88faddb9de6a7a3f09f73cba29fe92f8738f99e1ba4394724f521fe2a4dd5f5",
+      "bytes": 1023490
+    },
+    "tesis/figuras/fig_est_boxplots_vpd_riesgo.png": {
+      "sha256": "8fb3719728963b8986f7a77801cf8534e98858aac35c2a17ee60e8df89a54463",
+      "bytes": 352374
+    },
+    "tesis/figuras/fig_est_curvas_colab_plantdoc.png": {
+      "sha256": "2aadfbc7614fb1dd04ad3cca113e748f3b906ec1f2bc3931f4fc1edc6b90e2ab",
+      "bytes": 804182
+    },
+    "tesis/figuras/fig_est_distribucion_datasets_reales.png": {
+      "sha256": "80c81eb6414456b8ed816ad378b1d1eefd9a5f52633cc68afe8c74b19011de6b",
+      "bytes": 350575
+    },
+    "tesis/figuras/fig_est_residuos_fopdt.png": {
+      "sha256": "6a7b01a55e7a59174a99653695a1f1fdf43e9359d01dbec09c6bd44e345b0b52",
+      "bytes": 708238
+    },
+    "tesis/figuras/fig_exp_diseno_cascada_bloques.png": {
+      "sha256": "db3a42a4fec61ef29e53630bbf6b69de4d18f850f4874b95ba04411db1f94eb3",
+      "bytes": 765457
+    },
+    "tesis/figuras/fig_flujo_modelo_v.png": {
+      "sha256": "24bda9dda09b6d8813d42d567c3f7c0516009bb8e1f3fcb3f9fdd4745f9f1bbf",
+      "bytes": 822875
+    },
+    "tesis/figuras/fig_mapa_ubicacion_lapaz.png": {
+      "sha256": "01f1bebfc9607548dbf784081857cc0e8c3f3a193da2463a88ecc5726d1093d0",
+      "bytes": 873387
+    },
+    "tesis/informe_final.md": {
+      "sha256": "9d043aee09b5252f8f392d8f7b69b4657b694ddc6c4b2445f58201208cbba9b1",
+      "bytes": 14645
+    },
+    "tesis/pendientes.md": {
+      "sha256": "9bf39285741e8e2f582ce48fe7afdc0d7b70e1de56945104551be232da3879d4",
+      "bytes": 5513
+    },
+    "tesis/referencias_apa7.md": {
+      "sha256": "ada27cbd79c5092d1935eaec8823c5abbb4e00fce1d68f7971edac4905402797",
+      "bytes": 8557
+    },
+    "tesis/registro_evidencias.md": {
+      "sha256": "7978486a8555aafa637cd92b980117196a595bb716bd4c7bd93cf08780bb8958",
+      "bytes": 5584
+    },
+    "tesis/scripts/__pycache__/ensamblar_tesis_docx.cpython-314.pyc": {
+      "sha256": "c05b3c73ed4baa51ba8a81787de9ec581ef12e782de962a4df7294c3686bc7c9",
+      "bytes": 89607
+    },
+    "tesis/scripts/analisis_estadistico_tesis.py": {
+      "sha256": "06656b4785d26874946d697e876557ccbbf98e20869d8e6dc6ed1e2f346c2511",
+      "bytes": 60367
+    },
+    "tesis/scripts/ensamblar_tesis_docx.py": {
+      "sha256": "42b50c3577e0fd882293a01d613572cfb758a47badb25457544af7d3c7a01a0a",
+      "bytes": 72117
+    },
+    "tesis/scripts/generar_diagramas_tesis.py": {
+      "sha256": "22c5a37bb704d4435d6c896cc74c13c33b360e5b3ee2e6a39416e7a98352b03b",
+      "bytes": 50409
+    },
+    "tesis/scripts/geo_lapaz_bolivia.json": {
+      "sha256": "1073a963873a0d0911fcdf639b2a932dfc673f18d4f4e9474fd5db32e6c2a694",
+      "bytes": 329029
+    },
+    "tesis/tablas/tabla_01_descriptiva_agroclimatica.csv": {
+      "sha256": "6ed3b16cce9c8b82995726c385acd41b80cf7fa07b732c0e3b5c1b68c51a0132",
+      "bytes": 3079
+    },
+    "tesis/tablas/tabla_01_descriptiva_agroclimatica.md": {
+      "sha256": "7c4960053bc870d00d7a32b0ba2171b927317627571eb451d899e342e2259430",
+      "bytes": 2638
+    },
+    "tesis/tablas/tabla_02_fopdt_pid_comparativa.csv": {
+      "sha256": "cb6b0c20f98fe0f540a41d884a6f498000adaf078aa96d3630391e6488eb5905",
+      "bytes": 832
+    },
+    "tesis/tablas/tabla_02_fopdt_pid_comparativa.md": {
+      "sha256": "3493a8a29eb458341a4e207095324ea9e1b595b9555786da14d683a2e30f1e01",
+      "bytes": 1928
+    },
+    "tesis/tablas/tabla_03_modelos_vision_colab.csv": {
+      "sha256": "3b8b5afb4cfbd1a2600c7a184bfcf9a6dd4441d38a4cfc9eccdc4c337aa11b04",
+      "bytes": 1369
+    },
+    "tesis/tablas/tabla_03_modelos_vision_colab.md": {
+      "sha256": "4eb508cbbd3c22ce41a9c77dfd2fa9574ce793c1bfae01d0346f3dbab762f19f",
+      "bytes": 1970
+    },
+    "tesis/tablas/tabla_04_riesgo_fitopatologico.csv": {
+      "sha256": "9cf44dd709d8f83314e254f144e52962eb3dbdc7048cf02fb7941d3cf259f937",
+      "bytes": 818
+    },
+    "tesis/tablas/tabla_04_riesgo_fitopatologico.md": {
+      "sha256": "e1869c0ea6f26a2570bf575542b0c4a426bec23a18d4d9ac334138403fc417ad",
+      "bytes": 1547
+    },
+    "thesis/borrador/TG-I Tesis alvaro rodrigo de la barra velasco 1.2.docx": {
+      "sha256": "6d948e51776d94a5fe6cf8b6a51394e0b78ecac00408d96a5c2b2f063df1fc49",
+      "bytes": 1250914
+    },
+    "thesis/figuras/fig_blightmanager_vs_ml_roc.png": {
+      "sha256": "cdbda2743d94bd5d6ae56fdd88b4f0ddf88ae312f22d28d5af08804127059a82",
+      "bytes": 289848
+    },
+    "thesis/figuras/fig_comparativa_map_modelos.png": {
+      "sha256": "fc11bfb904feab1b99fc88d45c42e9f23d28841d837ff8e386f710d16e773254",
+      "bytes": 117209
+    },
+    "thesis/figuras/fig_comparativa_onoff_vs_pid.png": {
+      "sha256": "15f707d5fa1de40f04db5163c03641183adcd49c4b7522ab1688fd00e8649a38",
+      "bytes": 330233
+    },
+    "thesis/figuras/fig_comparativa_sintonias_pid.png": {
+      "sha256": "a7d4c922d9a45d443ea0712d27a335f863bf0ce9bbb10020b1d5b10e198240e3",
+      "bytes": 289086
+    },
+    "thesis/figuras/fig_curvas_calibracion_probabilidad.png": {
+      "sha256": "6846d8e787171f2a36ea7066fd3470985574248b6cf3b3eac143267fedab058b",
+      "bytes": 295490
+    },
+    "thesis/figuras/fig_fopdt_ajuste_escalon.png": {
+      "sha256": "33926aa03d3c6995cf922e3976cb035c5c5e1f78b9d6a382ab16c97a343064d4",
+      "bytes": 218069
+    },
+    "thesis/figuras/fig_latencia_vs_map_cpu.png": {
+      "sha256": "947035e36d17d278430acb73ae400629900fa307e9d036918de7e057e97fc635",
+      "bytes": 226415
+    },
+    "thesis/figuras/fig_matriz_confusion_vision.png": {
+      "sha256": "7a198c182ef9a6127c6d7d2955fde8129176f4e3ad84098942423a3f8ce68e3f",
+      "bytes": 181564
+    },
+    "thesis/figuras/fig_optuna_convergencia.png": {
+      "sha256": "9e0cc7ed34fe8a25f4f5245b35b72644295d4367e7f2e315e50568cae8411b36",
+      "bytes": 161362
+    },
+    "thesis/figuras/fig_sahi_mejora_objetos_pequenos.png": {
+      "sha256": "09e03b08625e027ed3a305bc402e891d9184a886f6cde02264adcf744c77d97f",
+      "bytes": 128420
+    },
+    "thesis/figuras/fig_shap_importancia_bioclimatica.png": {
+      "sha256": "70bbf2b4e71d779d02222a7014dc4791d78ec74f7ae56bec643294eb4dd5129d",
+      "bytes": 187111
+    },
+    "thesis/figuras/fig_simulacion_fusion_lazo_externo.png": {
+      "sha256": "6c8e740e2294c45630d26669c9ad16da9c40fe8f96719ebbc71ba624f3ff5c72",
+      "bytes": 616504
+    }
+  }
+}
